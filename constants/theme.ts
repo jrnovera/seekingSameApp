@@ -5,8 +5,9 @@
 
 import { Platform } from 'react-native';
 
-const tintColorLight = '#0a7ea4';
-const tintColorDark = '#fff';
+// App accent (purple from your mockups)
+const tintColorLight = '#a855f7';
+const tintColorDark = '#a855f7';
 
 export const Colors = {
   light: {
@@ -16,6 +17,17 @@ export const Colors = {
     icon: '#687076',
     tabIconDefault: '#687076',
     tabIconSelected: tintColorLight,
+    // Extended tokens for UI surfaces
+    screenBg: '#f6f7fb',
+    surface: '#f1f5f9',
+    surfaceSoft: '#eef2f7',
+    surfaceBorder: '#e8ecf4',
+    placeholder: '#9ca3af',
+    textMuted: '#6b7280',
+    badgeBg: '#38bdf8',
+    badgeText: '#ffffff',
+    accent2: '#3C95A6',
+    error: '#ef4444',
   },
   dark: {
     text: '#ECEDEE',
@@ -24,6 +36,17 @@ export const Colors = {
     icon: '#9BA1A6',
     tabIconDefault: '#9BA1A6',
     tabIconSelected: tintColorDark,
+    // Extended tokens for UI surfaces
+    screenBg: '#0a0a0a',
+    surface: '#0f172a',
+    surfaceSoft: '#111827',
+    surfaceBorder: '#1f2937',
+    placeholder: '#9aa3b2',
+    textMuted: '#9ca3af',
+    badgeBg: '#22d3ee',
+    badgeText: '#0f172a',
+    accent2: '#3C95A6',
+    error: '#f87171',
   },
 };
 
