@@ -1,12 +1,12 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
 import { useEffect } from 'react';
+import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { AuthProvider } from '../contexts/AuthContext';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { AuthProvider } from '../contexts/AuthContext';
 import { setupFirebaseAuthPersistence } from '../utils/setupFirebaseAuth';
 
 export const unstable_settings = {
@@ -29,6 +29,7 @@ export default function RootLayout() {
           <Stack>
             <Stack.Screen name="(auth)" options={{ headerShown: false }} />
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="property/details" options={{ headerShown: false }} />
           </Stack>
           <StatusBar style="auto" />
         </ThemeProvider>

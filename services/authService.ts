@@ -1,17 +1,25 @@
-import { 
-  createUserWithEmailAndPassword, 
-  signInWithEmailAndPassword, 
-  signOut, 
+import {
+  createUserWithEmailAndPassword,
   User as FirebaseUser,
-  updateProfile,
-  getIdToken
+  getIdToken,
+  signInWithEmailAndPassword,
+  signOut,
+  updateProfile
 } from 'firebase/auth';
+import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
-import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { CreateUserData, LoginData, User } from '../types/user';
 import { SecureStorage } from '../utils/secureStorage';
 
 export class AuthService {
+  // Helper method to convert undefined values to null for Firestore compatibility
+  private static convertUndefinedToNull(obj: any): any {
+    const converted: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      converted[key] = value === undefined ? null : value;
+    }
+    return converted;
+  }
   // Sign up new user
   static async signUp(userData: CreateUserData): Promise<{ user: FirebaseUser; userDoc: User }> {
     try {
@@ -37,7 +45,7 @@ export class AuthService {
         phone_number: userData.phone_number || '',
         created_time: new Date(),
         isNewUser: true,
-        role: 'user', // Default role
+        role: 'host', // Default role
         favorites: [],
         walkthrough: false,
         isVerified: false,
@@ -48,11 +56,14 @@ export class AuthService {
         idPhoto: undefined
       };
 
-      // Save to Firestore
-      await setDoc(doc(db, 'users', firebaseUser.uid), {
+      // Prepare data for Firestore (convert undefined to null, include all fields)
+      const firestoreData = this.convertUndefinedToNull({
         ...userDoc,
         created_time: serverTimestamp()
       });
+
+      // Save to Firestore
+      await setDoc(doc(db, 'users', firebaseUser.uid), firestoreData);
 
       // Get Firebase ID token and save to SecureStore
       const idToken = await getIdToken(firebaseUser);

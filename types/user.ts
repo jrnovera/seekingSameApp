@@ -2,7 +2,7 @@ export interface User {
   uid: string;
   email: string;
   display_name: string;
-  photo_url?: string;
+  photo_url?: string | null | undefined;
   phone_number?: string;
   password?: string; // Note: This should never be stored in Firestore
   created_time: Date;
@@ -13,7 +13,7 @@ export interface User {
   isVerified: boolean;
   isSuspended: boolean;
   recentSearch: string[];
-  idPhoto?: string;
+  idPhoto?: string | null | undefined;
   isSubscribe: boolean;
 }
 

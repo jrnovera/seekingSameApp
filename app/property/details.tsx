@@ -1,17 +1,16 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Alert } from 'react-native';
-import { useLocalSearchParams, router } from 'expo-router';
-import { doc, getDoc } from 'firebase/firestore';
+import RemoteImage from '@/components/remote-image';
 import { db } from '@/config/firebase';
 import { Colors } from '@/constants/theme';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import RemoteImage from '@/components/remote-image';
-import { useColorScheme } from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import { doc, getDoc } from 'firebase/firestore';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, useColorScheme, View } from 'react-native';
 
 type Property = {
   id: string;
   title?: string;
-  location?: string;
+  location?: string | { latitude: number; longitude: number; type?: string };
   price?: string | number;
   type?: string;
   imageUrl?: string | null;
@@ -31,10 +30,25 @@ type Property = {
 export default function PropertyDetails() {
   const { id } = useLocalSearchParams();
   const [property, setProperty] = useState<Property | null>(null);
+  console.log("check property:",JSON.stringify(property, null, 2))
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const scheme = useColorScheme() ?? 'light';
   const C = Colors[scheme as 'light' | 'dark'];
+
+  // Helper function to format location display
+  const getLocationDisplay = (property: Property): string => {
+    if (typeof property.location === 'string') {
+      return property.location;
+    }
+    
+    if (property.location && typeof property.location === 'object' && 'latitude' in property.location) {
+      // If we have a GeoPoint, display the coordinates
+      return `${property.location.latitude.toFixed(6)}, ${property.location.longitude.toFixed(6)}`;
+    }
+    
+    return property.address || `${property.city || ''} ${property.state || ''} ${property.zipCode || ''}`.trim() || 'Location not available';
+  };
 
   useEffect(() => {
     async function fetchProperty() {
@@ -59,7 +73,7 @@ export default function PropertyDetails() {
             location: data.location ?? data.city ?? data.address ?? 'Unknown',
             price: data.price ?? data.rent ?? undefined,
             type: data.type ?? data.category ?? undefined,
-            imageUrl: data.imageUrl ?? data.imageURL ?? data.photoUrl ?? data.photoURL ?? null,
+            imageUrl: data.imageUrl ?? data.photo ?? data.image ?? null,
             city: data.city ?? undefined,
             state: data.state ?? undefined,
             zipCode: data.zipCode ?? data.zip ?? undefined,
@@ -68,7 +82,7 @@ export default function PropertyDetails() {
             bedrooms: data.bedrooms ?? data.beds ?? undefined,
             bathrooms: data.bathrooms ?? data.baths ?? undefined,
             amenities: data.amenities ?? [],
-            address: data.address ?? data.fullAddress ?? undefined,
+            address: data.address ?? data.fullAddress ?? data.locationAddress ?? undefined,
           });
         } else {
           setError('Property not found');
@@ -141,7 +155,9 @@ export default function PropertyDetails() {
         
         <View style={styles.locationContainer}>
           <Ionicons name="location-outline" size={16} color={C.textMuted} />
-          <Text style={[styles.locationText, { color: C.textMuted }]}>{property.location}</Text>
+          <Text style={[styles.locationText, { color: C.textMuted }]}>
+            {getLocationDisplay(property)}
+          </Text>
         </View>
 
         <View style={styles.priceContainer}>
@@ -174,7 +190,7 @@ export default function PropertyDetails() {
         <View style={styles.locationDetailContainer}>
           <Text style={[styles.locationDetailTitle, { color: C.text }]}>Location</Text>
           <Text style={[styles.locationDetailText, { color: C.textMuted }]}>
-            {property.address || `${property.location}, ${property.city || ''} ${property.state || ''} ${property.zipCode || ''}`}
+            {property.address || getLocationDisplay(property)}
           </Text>
         </View>
 

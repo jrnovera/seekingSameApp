@@ -2,26 +2,27 @@ import FilterModal, { FilterOptions } from '@/components/FilterModal';
 import RemoteImage from '@/components/remote-image';
 import { db } from '@/config/firebase';
 import { Colors } from '@/constants/theme';
-import { AntDesign, Ionicons } from '@expo/vector-icons';
-import { collection, onSnapshot, query } from 'firebase/firestore';
-import { router } from 'expo-router';
-import React, { useEffect, useState } from 'react';
 import { addSampleProperties } from '@/utils/sampleData';
+import { AntDesign, Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import { collection, onSnapshot, query } from 'firebase/firestore';
+import React, { useEffect, useState } from 'react';
 import {
-    FlatList,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    useColorScheme,
-    View,
+  FlatList,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  useColorScheme,
+  View,
 } from 'react-native';
 
 type Property = {
   id: string;
   title?: string;
-  location?: string;
+  location?: string | { latitude: number; longitude: number; type?: string };
   price?: string | number;
   type?: string;
   imageUrl?: string | null;
@@ -31,11 +32,26 @@ type Property = {
   category?: string;
   latitude?: number;
   longitude?: number;
+  address?: string;
 };
 
 export default function Homepage() {
   const scheme = useColorScheme() ?? 'light';
   const C = Colors[scheme];
+
+  // Helper function to format location display
+  const getLocationDisplay = (property: Property): string => {
+    if (typeof property.location === 'string') {
+      return property.location;
+    }
+    
+    if (property.location && typeof property.location === 'object' && 'latitude' in property.location) {
+      // If we have a GeoPoint, display the coordinates
+      return `${property.location.latitude.toFixed(6)}, ${property.location.longitude.toFixed(6)}`;
+    }
+    
+    return property.address || `${property.city || ''} ${property.state || ''} ${property.zipCode || ''}`.trim() || 'Location not available';
+  };
 
   const categories = ['Room', 'Whole place', 'Co-living', 'Co-housing', 'RV Space', 'Other Type'];
   const hosts = [
@@ -95,13 +111,14 @@ export default function Homepage() {
           location: data.location ?? data.city ?? data.address ?? 'Unknown',
           price: data.price ?? data.rent ?? undefined,
           type: data.type ?? data.category ?? undefined,
-          imageUrl: data.imageUrl ?? data.imageURL ?? data.photoUrl ?? data.photoURL ?? null,
+          imageUrl: data.imageUrl ?? data.photo ?? null,
           city: data.city ?? undefined,
           state: data.state ?? undefined,
           zipCode: data.zipCode ?? data.zip ?? undefined,
           category: data.category ?? data.type ?? undefined,
           latitude,
           longitude,
+          address: data.address ?? data.fullAddress ?? data.locationAddress ?? undefined,
         };
         
         // Debug logging
@@ -109,6 +126,7 @@ export default function Homepage() {
         
         return property;
       });
+      console.log("check items:",JSON.stringify(items, null, 2))
       setProperties(items);
       // Initialize filtered properties if no filters are active
       if (!activeFilters.city && !activeFilters.state && !activeFilters.zipCode && 
@@ -128,7 +146,7 @@ export default function Homepage() {
     if (activeFilters.city.trim()) {
       filtered = filtered.filter(property => 
         property.city?.toLowerCase().includes(activeFilters.city.toLowerCase()) ||
-        property.location?.toLowerCase().includes(activeFilters.city.toLowerCase())
+        (typeof property.location === 'string' && property.location.toLowerCase().includes(activeFilters.city.toLowerCase()))
       );
     }
 
@@ -243,7 +261,7 @@ export default function Homepage() {
               <Text style={[styles.listingTitle, { color: C.text }]}>{String(item.title || 'Untitled')}</Text>
               <View style={styles.metaRow}>
                 <Ionicons name="location" size={14} color={C.icon} />
-                <Text style={[styles.metaText, { color: C.textMuted }]}>{String(item.location || 'Unknown')}</Text>
+                <Text style={[styles.metaText, { color: C.textMuted }]}>{getLocationDisplay(item)}</Text>
               </View>
               {item.price !== undefined && (
                 <Text style={[styles.priceText, { color: C.text }]}>Rent <Text style={{ color: C.accent2, fontWeight: '800' }}>{typeof item.price === 'number' ? `$${item.price}` : String(item.price)}</Text></Text>
@@ -297,7 +315,7 @@ export default function Homepage() {
               <Text numberOfLines={1} style={[styles.gridTitle, { color: C.text }]}>{String(l.title || 'Untitled')}</Text>
               <View style={styles.metaRow}>
                 <Ionicons name="location" size={14} color={C.icon} />
-                <Text style={[styles.metaText, { color: C.textMuted }]}>{String(l.location || 'Unknown')}</Text>
+                <Text style={[styles.metaText, { color: C.textMuted }]}>{getLocationDisplay(l)}</Text>
               </View>
               <View style={[styles.gridLikeBubble, { backgroundColor: C.tint }]}>
                 <Ionicons name="heart-outline" size={12} color="#fff" />
@@ -323,7 +341,7 @@ export default function Homepage() {
 
 const styles = StyleSheet.create({
   container: {
-    paddingTop: 8,
+    paddingTop: Platform.OS === 'ios' ? 60 : 82,
   },
   headerRow: {
     paddingHorizontal: 16,

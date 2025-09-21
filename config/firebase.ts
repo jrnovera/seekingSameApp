@@ -3,11 +3,9 @@ import 'react-native-get-random-values';
 import 'react-native-url-polyfill/auto';
 
 import { initializeApp } from 'firebase/app';
-import type { Auth } from 'firebase/auth';
-import { getAuth, initializeAuth } from 'firebase/auth';
+import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Firebase configuration using Expo public env variables
 // Note: Expo exposes only variables prefixed with EXPO_PUBLIC_ to the app at runtime
@@ -28,7 +26,7 @@ const firebaseConfig = {
   appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID || "1:483463161228:web:08b9e64a60b129813e62a9",
 };
 
-// console.log("Check firebase config", JSON.stringify(firebaseConfig, null, 2));
+ console.log("Check firebase config", JSON.stringify(firebaseConfig, null, 2));
 
 // Validate required config
 if (!firebaseConfig.storageBucket) {
