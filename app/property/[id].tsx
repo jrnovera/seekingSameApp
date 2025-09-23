@@ -1,12 +1,11 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Alert } from 'react-native';
-import { useLocalSearchParams, router } from 'expo-router';
-import { doc, getDoc } from 'firebase/firestore';
+import RemoteImage from '@/components/remote-image';
 import { db } from '@/config/firebase';
 import { Colors } from '@/constants/theme';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import RemoteImage from '@/components/remote-image';
-import { useColorScheme } from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import { doc, getDoc } from 'firebase/firestore';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, useColorScheme, View } from 'react-native';
 
 type Property = {
   id: string;
@@ -15,7 +14,9 @@ type Property = {
   price?: string | number;
   type?: string;
   imageUrl?: string | null;
-  city?: string;
+  cities?: string;
+  createdAt?: Date;
+  createdby?: string;
   state?: string;
   zipCode?: string;
   category?: string;
@@ -60,11 +61,27 @@ export default function PropertyDetails() {
         if (propertySnap.exists()) {
           const data = propertySnap.data() as any;
           
+          // Debug logging for cities data
+          console.log('Property data:', {
+            id: propertySnap.id,
+            city: data.city,
+            cities: data.cities,
+            location: data.location
+          });
+          
           // Safely handle lat/long to prevent errors
           let latitude: number | undefined;
           let longitude: number | undefined;
           
           try {
+            // Check if location is an object with coordinates
+            if (data.location && typeof data.location === 'object' && 'latitude' in data.location && 'longitude' in data.location) {
+              latitude = Number(data.location.latitude);
+              longitude = Number(data.location.longitude);
+              console.log('Found coordinates in location object:', latitude, longitude);
+            }
+            
+            // Also check for direct lat/long properties
             if (data.latitude !== undefined && data.latitude !== null && !isNaN(Number(data.latitude))) {
               latitude = Number(data.latitude);
             }
@@ -75,14 +92,25 @@ export default function PropertyDetails() {
             console.warn('Invalid lat/long data for property:', propertySnap.id, error);
           }
           
+          // Handle createdAt timestamp if it exists
+          let createdAt: Date | undefined;
+          if (data.createdAt) {
+            createdAt = data.createdAt.toDate ? data.createdAt.toDate() : new Date(data.createdAt);
+          }
+          
           setProperty({
             id: propertySnap.id,
             title: data.title ?? data.name ?? 'Untitled',
-            location: data.location ?? data.city ?? data.address ?? 'Unknown',
+            // Handle location data - don't use coordinates for display
+            location: typeof data.location === 'string' ? data.location : 
+                     (data.address ? data.address : 'Unknown'),
             price: data.price ?? data.rent ?? undefined,
             type: data.type ?? data.category ?? undefined,
             imageUrl: data.imageUrl ?? data.imageURL ?? data.photoUrl ?? data.photoURL ?? null,
-            city: data.city ?? undefined,
+            // Make sure we prioritize cities data
+            cities: data.city ?? data.cities ?? data.location?.city ?? undefined,
+            createdby: data.createdby ?? data.createdBy ?? data.created_by ?? data.owner ?? undefined,
+            createdAt: createdAt,
             state: data.state ?? undefined,
             zipCode: data.zipCode ?? data.zip ?? undefined,
             category: data.category ?? data.type ?? undefined,
@@ -169,7 +197,9 @@ export default function PropertyDetails() {
       
       <View style={styles.locationContainer}>
         <Ionicons name="location-outline" size={16} color={C.textMuted} />
-        <Text style={[styles.locationText, { color: C.textMuted }]}>{property.location}</Text>
+        <Text style={[styles.locationText, { color: C.textMuted }]}>
+          {property.cities || (typeof property.location === 'string' ? property.location : 'Location not available')}
+        </Text>
       </View>
 
       <View style={styles.priceContainer}>
@@ -202,7 +232,9 @@ export default function PropertyDetails() {
       <View style={styles.locationDetailContainer}>
         <Text style={[styles.locationDetailTitle, { color: C.text }]}>Location</Text>
         <Text style={[styles.locationDetailText, { color: C.textMuted }]}>
-          {property.address || `${property.location}, ${property.city || ''} ${property.state || ''} ${property.zipCode || ''}`}
+          {property.cities ? 
+            `${property.cities}${property.state ? `, ${property.state}` : ''}${property.zipCode ? ` ${property.zipCode}` : ''}` : 
+            property.address || (typeof property.location === 'string' ? property.location : 'Location not available')}
         </Text>
       </View>
 
@@ -212,6 +244,28 @@ export default function PropertyDetails() {
           <Text style={[styles.descriptionText, { color: C.textMuted }]}>{property.description}</Text>
         </View>
       )}
+
+      {/* Created By and Created At Information */}
+      <View style={[styles.createdInfoContainer, { 
+        backgroundColor: scheme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+        borderColor: C.surfaceBorder,
+        borderWidth: 1
+      }]}>
+        {property.createdby && (
+          <View style={styles.createdInfoItem}>
+            <Text style={[styles.createdInfoLabel, { color: C.text }]}>Listed by:</Text>
+            <Text style={[styles.createdInfoValue, { color: C.textMuted }]}>{property.createdby}</Text>
+          </View>
+        )}
+        {property.createdAt && (
+          <View style={styles.createdInfoItem}>
+            <Text style={[styles.createdInfoLabel, { color: C.text }]}>Listed on:</Text>
+            <Text style={[styles.createdInfoValue, { color: C.textMuted }]}>
+              {property.createdAt.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+            </Text>
+          </View>
+        )}
+      </View>
 
       {/* Reviews Section */}
       <View style={styles.reviewsContainer}>
@@ -408,6 +462,23 @@ const styles = StyleSheet.create({
   descriptionText: {
     fontSize: 14,
     lineHeight: 20,
+  },
+  createdInfoContainer: {
+    marginBottom: 24,
+    padding: 12,
+    borderRadius: 8,
+  },
+  createdInfoItem: {
+    flexDirection: 'row',
+    marginBottom: 4,
+  },
+  createdInfoLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginRight: 8,
+  },
+  createdInfoValue: {
+    fontSize: 14,
   },
   reviewsContainer: {
     marginBottom: 24,

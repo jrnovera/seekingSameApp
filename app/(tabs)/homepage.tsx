@@ -1,14 +1,19 @@
 import FilterModal, { FilterOptions } from '@/components/FilterModal';
 import RemoteImage from '@/components/remote-image';
-import { db } from '@/config/firebase';
+import { auth, db } from '@/config/firebase';
 import { Colors } from '@/constants/theme';
 import { addSampleProperties } from '@/utils/sampleData';
-import { AntDesign, Ionicons } from '@expo/vector-icons';
+import { AntDesign, Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { collection, onSnapshot, query } from 'firebase/firestore';
-import React, { useEffect, useState } from 'react';
+import { onAuthStateChanged } from 'firebase/auth';
+import { collection, doc, getDoc, onSnapshot, query } from 'firebase/firestore';
+import React, { useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
+  Animated,
+  Easing,
   FlatList,
+  Image,
   Platform,
   ScrollView,
   StyleSheet,
@@ -21,46 +26,145 @@ import {
 
 type Property = {
   id: string;
+  name?: string;
   title?: string;
-  location?: string | { latitude: number; longitude: number; type?: string };
+  descriptions?: string;
+  email?: string;
+  phoneNumber?: string;
+  cities?: string;
+  capacity?: number;
+  categories?: string;
   price?: string | number;
-  type?: string;
+  deposit?: string | number;
+  parkingSizeForRv?: number;
+  bathroomType?: string;
+  bedroomCount?: number;
+  BathRoomCount?: number;
+  amenities?: string[];
+  preferences?: string[];
+  isAvailable?: boolean;
+  isVerified?: boolean;
+  samplePhotos?: string[];
+  photo?: string;
   imageUrl?: string | null;
-  city?: string;
+  imageFile?: any;
+  location?: string | { latitude: string | number; longitude: string | number; type?: string };
+  latitude?: number | string;
+  longitude?: number | string;
+  type?: string;
   state?: string;
   zipCode?: string;
   category?: string;
-  latitude?: number;
-  longitude?: number;
-  address?: string;
+  address?: string | {
+    street?: string;
+    unit?: string;
+    city?: string;
+    state?: string;
+    zipCode?: string;
+    country?: string;
+  };
 };
 
 export default function Homepage() {
   const scheme = useColorScheme() ?? 'light';
   const C = Colors[scheme];
+  const [userName, setUserName] = useState<string>('User');
+  const [userAvatar, setUserAvatar] = useState<string | null>(null);
+  
+  // Animation values
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
+  const scaleAnim = useRef(new Animated.Value(0.95)).current;
 
   // Helper function to format location display
   const getLocationDisplay = (property: Property): string => {
-    if (typeof property.location === 'string') {
+    // Always prioritize cities if available
+    if (typeof property.cities === 'string' && property.cities.trim() !== '') {
+      return property.cities;
+    }
+    
+    // If we have a structured address object
+    if (property.address && typeof property.address === 'object') {
+      const addr = property.address;
+      if (addr.city) {
+        // Return city, state if available
+        if (addr.state) {
+          return `${addr.city}, ${addr.state}`;
+        }
+        return addr.city;
+      }
+      
+      // If no city, try to construct from other address parts
+      const addressParts = [];
+      if (addr.street) addressParts.push(addr.street);
+      if (addr.unit) addressParts.push(addr.unit);
+      if (addr.state) addressParts.push(addr.state);
+      if (addr.zipCode) addressParts.push(addr.zipCode);
+      
+      if (addressParts.length > 0) {
+        return addressParts.join(', ');
+      }
+    }
+    
+    // If we have coordinates in the location object
+    if (property.location && typeof property.location === 'object' && 'latitude' in property.location) {
+      const lat = typeof property.location.latitude === 'string' 
+        ? parseFloat(property.location.latitude) 
+        : property.location.latitude;
+      
+      const lng = typeof property.location.longitude === 'string' 
+        ? parseFloat(property.location.longitude) 
+        : property.location.longitude;
+      
+      if (!isNaN(lat) && !isNaN(lng)) {
+        return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+      }
+    }
+    
+    // If we have a string address, use it
+    if (property.address && typeof property.address === 'string' && property.address.trim() !== '') {
+      return property.address;
+    }
+    
+    // Fallback to formatted location string
+    const formattedLocation = `${property.state || ''} ${property.zipCode || ''}`.trim();
+    if (formattedLocation) {
+      return formattedLocation;
+    }
+    
+    // Last resort, use location string if it exists
+    if (typeof property.location === 'string' && property.location.trim() !== '') {
       return property.location;
     }
     
-    if (property.location && typeof property.location === 'object' && 'latitude' in property.location) {
-      // If we have a GeoPoint, display the coordinates
-      return `${property.location.latitude.toFixed(6)}, ${property.location.longitude.toFixed(6)}`;
-    }
-    
-    return property.address || `${property.city || ''} ${property.state || ''} ${property.zipCode || ''}`.trim() || 'Location not available';
+    return 'Location not available';
   };
 
-  const categories = ['Room', 'Whole place', 'Co-living', 'Co-housing', 'RV Space', 'Other Type'];
-  const hosts = [
-    { id: '1', name: 'newuser', price: '$300/ month' },
-    { id: '2', name: 'sally', price: '$320/ month' },
-    { id: '3', name: 'james', price: '$280/ month' },
+  // Categories with icons
+  const categories = [
+    { name: 'Room', icon: 'bed-outline' },
+    { name: 'Whole place', icon: 'home-outline' },
+    { name: 'Co-living', icon: 'people-outline' },
+    { name: 'Co-housing', icon: 'business-outline' },
+    { name: 'RV Space', icon: 'car-outline' },
+    { name: 'Other Type', icon: 'ellipsis-horizontal-outline' }
   ];
+  
+  // Define Host type
+  type Host = {
+    id: string;
+    name: string;
+    photoURL?: string;
+    email?: string;
+    rating?: number;
+    listingsCount?: number;
+  };
+  
   const [properties, setProperties] = useState<Property[]>([]);
   const [filteredProperties, setFilteredProperties] = useState<Property[]>([]);
+  const [hosts, setHosts] = useState<Host[]>([]);
+  const [hostsLoading, setHostsLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [activeFilters, setActiveFilters] = useState<FilterOptions>({
     city: '',
@@ -68,8 +172,14 @@ export default function Homepage() {
     zipCode: '',
     priceRange: [0, 5000],
     categories: [],
+    // Initialize new filter fields
+    bathroomType: undefined,
+    bedroomCount: undefined,
+    capacity: undefined,
   });
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [loadingSampleData, setLoadingSampleData] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const handleAddSampleData = async () => {
     setLoadingSampleData(true);
@@ -83,7 +193,139 @@ export default function Homepage() {
     }
   };
 
+  // Load user profile data
   useEffect(() => {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        try {
+          // Get user's display name from Firebase Auth
+          let displayName = user.displayName || 'User';
+          
+          // Try to get additional user data from Firestore
+          const userDoc = await getDoc(doc(db, 'users', user.uid));
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            // Use Firestore data if available
+            displayName = userData.displayName || userData.name || displayName;
+            setUserAvatar(userData.photoURL || userData.avatar || null);
+          }
+          
+          // Extract first name or use full name
+          const firstName = displayName.split(' ')[0];
+          setUserName(firstName);
+        } catch (error) {
+          console.error('Error fetching user data:', error);
+        }
+      } else {
+        setUserName('Guest');
+        setUserAvatar(null);
+      }
+    });
+    
+    return () => unsubscribeAuth();
+  }, []);
+  
+  // Start entrance animations
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+        easing: Easing.out(Easing.quad)
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 600,
+        useNativeDriver: true,
+        easing: Easing.out(Easing.quad)
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+        easing: Easing.out(Easing.quad)
+      })
+    ]).start();
+  }, []);
+
+  // Fetch all users and filter hosts in the code
+  useEffect(() => {
+    setHostsLoading(true);
+    
+    // Function to filter hosts by role and sort by creation date
+    const filterAndSortHosts = (users: any[]) => {
+      return users
+        .filter(user => user.role === 'host') // Filter users with role 'host'
+        .sort((a, b) => {
+          // Sort by createdAt in descending order (newest first)
+          const dateA = a.createdAt ? new Date(a.createdAt.toDate()).getTime() : 0;
+          const dateB = b.createdAt ? new Date(b.createdAt.toDate()).getTime() : 0;
+          return dateB - dateA;
+        })
+        .slice(0, 10); // Limit to 10 hosts
+    };
+    
+    // Get all users and filter in the code
+    const unsubscribeHosts = onSnapshot(collection(db, 'users'), (snapshot) => {
+      try {
+        // Get all users
+        const allUsers = snapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            ...data,
+            name: data.displayName || data.name || data.email || 'Unknown Host',
+            photoURL: data.photoURL || data.avatar,
+            rating: data.rating || 4.5,
+            listingsCount: data.listingsCount || Math.floor(Math.random() * 5) + 1, // Temporary random count
+            createdAt: data.createdAt
+          };
+        });
+        
+        // Filter and sort hosts
+        const filteredHosts = filterAndSortHosts(allUsers);
+        
+        // Map to the required format
+        const hostsList = filteredHosts.map(host => ({
+          id: host.id,
+          name: host.name,
+          photoURL: host.photoURL,
+          email: host.email,
+          rating: host.rating,
+          listingsCount: host.listingsCount,
+          createdBy: host.createdBy || null
+        }));
+        
+        setHosts(hostsList);
+        setHostsLoading(false);
+      } catch (error) {
+        console.error('Error processing hosts data:', error);
+        setHostsLoading(false);
+        // Fallback to sample data if error
+        setHosts([
+          { id: '1', name: 'John Doe', rating: 4.8, listingsCount: 3 },
+          { id: '2', name: 'Sarah Smith', rating: 4.6, listingsCount: 2 },
+          { id: '3', name: 'Michael Brown', rating: 4.9, listingsCount: 5 }
+        ]);
+      }
+    }, (error) => {
+      console.error('Error fetching users:', error);
+      setHostsLoading(false);
+      // Fallback to sample data if error
+      setHosts([
+        { id: '1', name: 'John Doe', rating: 4.8, listingsCount: 3 },
+        { id: '2', name: 'Sarah Smith', rating: 4.6, listingsCount: 2 },
+        { id: '3', name: 'Michael Brown', rating: 4.9, listingsCount: 5 }
+      ]);
+    });
+    
+    return () => unsubscribeHosts();
+  }, []);
+
+  // Fetch properties
+  useEffect(() => {
+    setIsLoading(true);
     // Subscribe to the 'property' collection in Firestore
     const q = query(collection(db, 'property'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -107,14 +349,32 @@ export default function Homepage() {
         
         const property = {
           id: doc.id,
+          name: data.name ?? undefined,
           title: data.title ?? data.name ?? 'Untitled',
-          location: data.location ?? data.city ?? data.address ?? 'Unknown',
+          descriptions: data.descriptions ?? data.description ?? undefined,
+          email: data.email ?? undefined,
+          phoneNumber: data.phoneNumber ?? data.phone ?? undefined,
+          cities: data.city ?? data.cities ?? undefined,
+          capacity: data.capacity ?? undefined,
+          categories: data.categories ?? data.category ?? undefined,
           price: data.price ?? data.rent ?? undefined,
-          type: data.type ?? data.category ?? undefined,
+          deposit: data.deposit ?? undefined,
+          parkingSizeForRv: data.parkingSizeForRv ?? undefined,
+          bathroomType: data.bathroomType ?? undefined,
+          bedroomCount: data.bedroomCount ?? undefined,
+          BathRoomCount: data.BathRoomCount ?? data.bathroomCount ?? undefined,
+          amenities: data.amenities ?? [],
+          preferences: data.preferences ?? [],
+          isAvailable: data.isAvailable ?? true,
+          isVerified: data.isVerified ?? false,
+          samplePhotos: data.samplePhotos ?? [],
+          photo: data.photo ?? undefined,
           imageUrl: data.imageUrl ?? data.photo ?? null,
-          city: data.city ?? undefined,
-          state: data.state ?? undefined,
-          zipCode: data.zipCode ?? data.zip ?? undefined,
+          imageFile: data.imageFile ?? null,
+          location: data.location ?? data.address ?? 'Unknown',
+          type: data.type ?? data.category ?? undefined,
+          state: data.state ?? (typeof data.address === 'object' ? data.address.state : undefined),
+          zipCode: data.zipCode ?? data.zip ?? (typeof data.address === 'object' ? data.address.zipCode : undefined),
           category: data.category ?? data.type ?? undefined,
           latitude,
           longitude,
@@ -133,19 +393,95 @@ export default function Homepage() {
           activeFilters.priceRange[1] >= 5000 && activeFilters.categories.length === 0) {
         setFilteredProperties(items);
       }
+      setIsLoading(false);
     });
 
     return () => unsubscribe();
   }, []);
 
-  // Apply filters whenever properties or activeFilters change
+  // Check if search or filters are active
+  const isSearchActive = () => {
+    return searchQuery.trim() !== '' || activeCategory !== null || hasActiveFilters();
+  };
+
+  // Apply filters and search whenever properties, activeFilters, or searchQuery change
   useEffect(() => {
     let filtered = properties;
+    
+    // Apply search query if present
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter(property => 
+        // Search in title and name
+        property.title?.toLowerCase().includes(query) ||
+        property.name?.toLowerCase().includes(query) ||
+        
+        // Search in descriptions
+        property.descriptions?.toLowerCase().includes(query) ||
+        
+        // Search in location fields
+        property.cities?.toLowerCase().includes(query) ||
+        (typeof property.location === 'string' && property.location.toLowerCase().includes(query)) ||
+        
+        // Search in address fields if object
+        (property.address && typeof property.address === 'object' && (
+          property.address.street?.toLowerCase().includes(query) ||
+          property.address.city?.toLowerCase().includes(query) ||
+          property.address.state?.toLowerCase().includes(query) ||
+          property.address.zipCode?.toLowerCase().includes(query)
+        )) ||
+        
+        // Search in type and category
+        property.type?.toLowerCase().includes(query) ||
+        property.category?.toLowerCase().includes(query) ||
+        property.categories?.toLowerCase().includes(query) ||
+        
+        // Search in amenities
+        (property.amenities && Array.isArray(property.amenities) && 
+          property.amenities.some(amenity => amenity.toLowerCase().includes(query))) ||
+        
+        // Search in preferences
+        (property.preferences && Array.isArray(property.preferences) && 
+          property.preferences.some(preference => preference.toLowerCase().includes(query)))
+      );
+    }
+    
+    // Filter by active category chip
+    if (activeCategory) {
+      const categoryLower = activeCategory.toLowerCase();
+      filtered = filtered.filter(property => {
+        // Check in multiple property fields that might contain category info
+        return (
+          // Direct type/category fields
+          (property.type && property.type.toLowerCase().includes(categoryLower)) ||
+          (property.category && property.category.toLowerCase().includes(categoryLower)) ||
+          (property.categories && property.categories.toLowerCase().includes(categoryLower)) ||
+          
+          // Check in arrays if available
+          (property.amenities && Array.isArray(property.amenities) && 
+            property.amenities.some(a => a.toLowerCase().includes(categoryLower))) ||
+          
+          // Check if it's an exact match for room type categories
+          (categoryLower === 'room' && property.type?.toLowerCase() === 'room') ||
+          (categoryLower === 'whole place' && 
+            (property.type?.toLowerCase() === 'whole place' || 
+             property.type?.toLowerCase() === 'apartment' || 
+             property.type?.toLowerCase() === 'house')) ||
+          (categoryLower === 'co-living' && 
+            (property.type?.toLowerCase() === 'co-living' || 
+             property.type?.toLowerCase().includes('coliving') || 
+             property.type?.toLowerCase().includes('co-living'))) ||
+          (categoryLower === 'rv space' && 
+            (property.type?.toLowerCase().includes('rv') || 
+             property.type?.toLowerCase().includes('recreational vehicle')))
+        );
+      });
+    }
 
     // Filter by city
     if (activeFilters.city.trim()) {
       filtered = filtered.filter(property => 
-        property.city?.toLowerCase().includes(activeFilters.city.toLowerCase()) ||
+        property.cities?.toLowerCase().includes(activeFilters.city.toLowerCase()) ||
         (typeof property.location === 'string' && property.location.toLowerCase().includes(activeFilters.city.toLowerCase()))
       );
     }
@@ -179,25 +515,100 @@ export default function Homepage() {
       filtered = filtered.filter(property => 
         activeFilters.categories.some(category => 
           property.category?.toLowerCase().includes(category.toLowerCase()) ||
+          property.categories?.toLowerCase().includes(category.toLowerCase()) ||
           property.type?.toLowerCase().includes(category.toLowerCase())
         )
       );
     }
+    
+    // Additional filters for new fields
+    // Filter by bathroom type if added to filter options
+    if (activeFilters.bathroomType) {
+      filtered = filtered.filter(property => 
+        property.bathroomType === activeFilters.bathroomType
+      );
+    }
+    
+    // Filter by bedroom count if added to filter options
+    if (activeFilters.bedroomCount !== undefined) {
+      const minBedroomCount = activeFilters.bedroomCount; // Store in a constant to avoid TS errors
+      filtered = filtered.filter(property => 
+        property.bedroomCount !== undefined && 
+        property.bedroomCount >= minBedroomCount
+      );
+    }
+    
+    // Filter by capacity if added to filter options
+    if (activeFilters.capacity !== undefined) {
+      const minCapacity = activeFilters.capacity; // Store in a constant to avoid TS errors
+      filtered = filtered.filter(property => 
+        property.capacity !== undefined && 
+        property.capacity >= minCapacity
+      );
+    }
 
     setFilteredProperties(filtered);
-  }, [properties, activeFilters]);
+  }, [properties, activeFilters, searchQuery, activeCategory]);
+
+  // Check if any filters are active
+  const hasActiveFilters = () => {
+    return (
+      activeFilters.city.trim() !== '' ||
+      activeFilters.state.trim() !== '' ||
+      activeFilters.zipCode.trim() !== '' ||
+      activeFilters.priceRange[1] < 5000 ||
+      activeFilters.categories.length > 0 ||
+      activeFilters.bathroomType !== undefined ||
+      activeFilters.bedroomCount !== undefined ||
+      activeFilters.capacity !== undefined
+    );
+  };
 
   const handleApplyFilters = (filters: FilterOptions) => {
     setActiveFilters(filters);
   };
+  
+  // Clear all filters and search
+  const clearAllFilters = () => {
+    setActiveFilters({
+      city: '',
+      state: '',
+      zipCode: '',
+      priceRange: [0, 5000],
+      categories: [],
+      // Reset new filter fields
+      bathroomType: undefined,
+      bedroomCount: undefined,
+      capacity: undefined,
+    });
+    setSearchQuery('');
+    setActiveCategory(null);
+  };
 
   return (
     <>
-    <ScrollView contentContainerStyle={[styles.container, { backgroundColor: C.screenBg }]}> 
+    <Animated.ScrollView 
+      contentContainerStyle={[styles.container, { backgroundColor: C.screenBg }]}
+      style={{
+        opacity: fadeAnim,
+        transform: [{ translateY: slideAnim }]
+      }}
+    > 
       {/* Greeting header */}
       <View style={styles.headerRow}>
-        <Text style={[styles.heyText, { color: C.text }]}>Hey, <Text style={{ color: C.tint, fontWeight: '800' }}>sample</Text></Text>
-        <View style={[styles.avatar, { backgroundColor: C.tint }]} />
+        <Text style={[styles.heyText, { color: C.text }]}>Hey, <Text style={{ color: '#3c95a6', fontWeight: '800' }}>{userName}</Text></Text>
+        <TouchableOpacity 
+          onPress={() => router.push('/profile')}
+          activeOpacity={0.8}
+        >
+          {userAvatar ? (
+            <Image source={{ uri: userAvatar }} style={styles.avatar} />
+          ) : (
+            <View style={[styles.avatar, { backgroundColor: C.tint }]}>
+              <Text style={styles.avatarText}>{userName.charAt(0).toUpperCase()}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
       </View>
 
       {/* Add Sample Data Button (temporary) */}
@@ -223,110 +634,354 @@ export default function Homepage() {
           placeholder="Search House, Apartment, etc"
           placeholderTextColor={C.placeholder}
           style={styles.searchInput}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          returnKeyType="search"
+          clearButtonMode="while-editing"
         />
+        {searchQuery ? (
+          <TouchableOpacity 
+            activeOpacity={0.8} 
+            style={styles.clearButton}
+            onPress={() => setSearchQuery('')}
+          > 
+            <AntDesign name="close" size={16} color={C.icon} />
+          </TouchableOpacity>
+        ) : null}
         <TouchableOpacity 
           activeOpacity={0.8} 
-          style={[styles.filterBtn, { backgroundColor: C.surfaceSoft }]}
+          style={[styles.filterBtn, { 
+            backgroundColor: hasActiveFilters() ? C.tint : C.surfaceSoft 
+          }]}
           onPress={() => setShowFilterModal(true)}
         > 
-          <Ionicons name="filter" size={18} color={C.icon} />
+          <Ionicons name="filter" size={18} color={hasActiveFilters() ? '#fff' : C.icon} />
         </TouchableOpacity>
       </View>
 
-      {/* Category chips */}
-      <View style={styles.chipsWrap}>
-        {categories.map((c) => (
-          <View key={c} style={[styles.chip, { backgroundColor: C.surface, borderColor: C.surfaceBorder }]}> 
-            <Text style={[styles.chipText, { color: C.textMuted }]}>{c}</Text>
-          </View>
-        ))}
-      </View>
-
-      {/* Featured horizontal card */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.featuredRow}>
-        {filteredProperties.length > 0 && filteredProperties.slice(0, 10).map((item) => (
-          <TouchableOpacity 
-            key={`featured-${item.id}`} 
-            activeOpacity={0.9} 
-            style={[styles.featureCard, { backgroundColor: C.surface, borderColor: C.surfaceBorder }]}
-            onPress={() => router.push({pathname: '/property/details', params: {id: item.id}})}> 
-            <RemoteImage uri={item.imageUrl ?? null} style={styles.photo} borderRadius={0}>
-              {!!item.type && (
-                <View style={[styles.badge, { backgroundColor: C.accent2 }]}>
-                  <Text style={[styles.badgeText, { color: '#ffffff' }]}>{String(item.type)}</Text>
-                </View>
-              )}
-            </RemoteImage>
-            <View style={styles.featureMeta}>
-              <Text style={[styles.listingTitle, { color: C.text }]}>{String(item.title || 'Untitled')}</Text>
-              <View style={styles.metaRow}>
-                <Ionicons name="location" size={14} color={C.icon} />
-                <Text style={[styles.metaText, { color: C.textMuted }]}>{getLocationDisplay(item)}</Text>
-              </View>
-              {item.price !== undefined && (
-                <Text style={[styles.priceText, { color: C.text }]}>Rent <Text style={{ color: C.accent2, fontWeight: '800' }}>{typeof item.price === 'number' ? `$${item.price}` : String(item.price)}</Text></Text>
-              )}
-            </View>
-            <TouchableOpacity style={[styles.likeBubble, { backgroundColor: C.tint }]} activeOpacity={0.8}>
-              <AntDesign name="heart" size={14} color="#fff" />
+      {/* Category chips in grid layout */}
+      <View style={styles.filtersContainer}>
+        <View style={styles.chipsGrid}>
+          {categories.slice(0, 3).map((c) => (
+            <TouchableOpacity 
+              key={c.name} 
+              style={[styles.chip, { 
+                backgroundColor: activeCategory === c.name ? C.tint : C.surface, 
+                borderColor: activeCategory === c.name ? C.tint : C.surfaceBorder 
+              }]} 
+              onPress={() => {
+                if (activeCategory === c.name) {
+                  setActiveCategory(null); // Deselect if already selected
+                } else {
+                  setActiveCategory(c.name); // Select this category
+                }
+              }}
+            > 
+              <Ionicons 
+                name={c.icon as any} 
+                size={16} 
+                color={activeCategory === c.name ? '#fff' : C.textMuted} 
+                style={styles.chipIcon} 
+              />
+              <Text style={[styles.chipText, { 
+                color: activeCategory === c.name ? '#fff' : C.textMuted 
+              }]}>{c.name}</Text>
             </TouchableOpacity>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
-      {/* New Hosts */}
-      <View style={styles.sectionHeader}>
-        <Text style={[styles.sectionTitle, { color: C.text }]}>New Hosts</Text>
-        <TouchableOpacity activeOpacity={0.7}><Text style={[styles.viewAll, { color: C.tint }]}>view all</Text></TouchableOpacity>
+          ))}
+        </View>
+        
+        <View style={styles.chipsGrid}>
+          {categories.slice(3).map((c) => (
+            <TouchableOpacity 
+              key={c.name} 
+              style={[styles.chip, { 
+                backgroundColor: activeCategory === c.name ? C.tint : C.surface, 
+                borderColor: activeCategory === c.name ? C.tint : C.surfaceBorder 
+              }]} 
+              onPress={() => {
+                if (activeCategory === c.name) {
+                  setActiveCategory(null); // Deselect if already selected
+                } else {
+                  setActiveCategory(c.name); // Select this category
+                }
+              }}
+            > 
+              <Ionicons 
+                name={c.icon as any} 
+                size={16} 
+                color={activeCategory === c.name ? '#fff' : C.textMuted} 
+                style={styles.chipIcon} 
+              />
+              <Text style={[styles.chipText, { 
+                color: activeCategory === c.name ? '#fff' : C.textMuted 
+              }]}>{c.name}</Text>
+            </TouchableOpacity>
+          ))}
+          
+          {/* Clear filters button */}
+          {(searchQuery || activeCategory || hasActiveFilters()) && (
+            <TouchableOpacity 
+              style={[styles.clearFiltersBtn, { 
+                borderColor: C.tint,
+                backgroundColor: activeCategory ? 'rgba(60, 149, 166, 0.1)' : 'transparent'
+              }]}
+              onPress={clearAllFilters}
+            >
+              <Text style={[styles.clearFiltersBtnText, { 
+                color: C.tint,
+                fontWeight: activeCategory ? '700' : '600'
+              }]}>Clear</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
-      <FlatList
-        data={hosts}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        keyExtractor={(i) => i.id}
-        contentContainerStyle={{ paddingHorizontal: 16 }}
-        renderItem={({ item }) => (
-          <View style={[styles.hostCard, { backgroundColor: C.surface, borderColor: C.surfaceBorder }]}> 
-            <View style={[styles.hostAvatar, { backgroundColor: C.tint }]} />
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.hostName, { color: C.text }]}>{item.name}</Text>
-              <Text style={[styles.hostPrice, { color: C.textMuted }]}>{item.price}</Text>
-            </View>
+      
+      {/* No results message when search is active but no properties found */}
+      {isSearchActive() && filteredProperties.length === 0 && (
+        <View style={styles.noResultsContainer}>
+          <Ionicons name="search-outline" size={64} color={C.textMuted} />
+          <Text style={[styles.noResultsTitle, { color: C.text }]}>No properties found</Text>
+          <Text style={[styles.noResultsMessage, { color: C.textMuted }]}>
+            Try adjusting your search or filters
+          </Text>
+          <TouchableOpacity 
+            style={[styles.clearFiltersBtn, { borderColor: C.tint, marginTop: 16 }]}
+            onPress={clearAllFilters}
+          >
+            <Text style={[styles.clearFiltersBtnText, { color: C.tint }]}>Clear Filters</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Featured Properties Section - Only show when search is not active */}
+      {!isSearchActive() && (
+        <>
+          <View style={styles.sectionTitleRow}>
+            <Text style={[styles.heyText, { color: C.text }]}>Featured Properties</Text>
+            <Text style={[styles.resultsCount, { color: C.textMuted }]}>
+              {filteredProperties.length} results
+            </Text>
           </View>
-        )}
-      />
+
+          {filteredProperties.length === 0 ? (
+            <View style={styles.noResultsContainer}>
+              <Ionicons name="search-outline" size={64} color={C.textMuted} />
+              <Text style={[styles.noResultsTitle, { color: C.text }]}>No properties found</Text>
+              <Text style={[styles.noResultsMessage, { color: C.textMuted }]}>
+                Try adjusting your search or filters
+              </Text>
+              <TouchableOpacity 
+                style={[styles.clearFiltersBtn, { borderColor: C.tint, marginTop: 16 }]}
+                onPress={clearAllFilters}
+              >
+                <Text style={[styles.clearFiltersBtnText, { color: C.tint }]}>Clear Filters</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.featuredRow}>
+              {filteredProperties.slice(0, 10).map((item, index) => (
+              <Animated.View 
+                key={`featured-${item.id}`}
+                style={{
+                  opacity: fadeAnim,
+                  transform: [{ scale: scaleAnim }, { translateY: Animated.multiply(slideAnim, new Animated.Value(index * 0.5 + 1)) }]
+                }}
+              >
+                <TouchableOpacity 
+                  activeOpacity={0.9} 
+                  style={[styles.featureCard, { backgroundColor: C.surface, borderColor: C.surfaceBorder }]}
+                  onPress={() => router.push(`/property/details?id=${item.id}`)}> 
+                  <RemoteImage uri={item.imageUrl ?? null} style={styles.photo} borderRadius={16}>
+                    {!!item.type && (
+                      <View style={[styles.badge, { backgroundColor: '#3c95a6' }]}>
+                        <Text style={[styles.badgeText, { color: '#ffffff' }]}>{String(item.type)}</Text>
+                      </View>
+                    )}
+                  </RemoteImage>
+                  <View style={styles.featureMeta}>
+                    <Text style={[styles.listingTitle, { color: C.text }]}>{String(item.title || 'Untitled')}</Text>
+                    <View style={styles.metaRow}>
+                      <MaterialIcons name="location-on" size={14} color="#666" />
+                      <Text style={[styles.metaText, { color: C.textMuted }]}>{getLocationDisplay(item)}</Text>
+                      <TouchableOpacity style={styles.heartButton} activeOpacity={0.8}>
+                        <AntDesign name="heart" size={18} color="#3c95a6" />
+                      </TouchableOpacity>
+                    </View>
+                    
+                    {/* Property details row */}
+                    <View style={styles.detailsRow}>
+                      {item.bedroomCount !== undefined && (
+                        <View style={styles.detailItem}>
+                          <Ionicons name="bed-outline" size={14} color={C.textMuted} />
+                          <Text style={[styles.detailText, { color: C.textMuted }]}>{item.bedroomCount} {item.bedroomCount === 1 ? 'bed' : 'beds'}</Text>
+                        </View>
+                      )}
+                      
+                      {item.BathRoomCount !== undefined && (
+                        <View style={styles.detailItem}>
+                          <Ionicons name="water-outline" size={14} color={C.textMuted} />
+                          <Text style={[styles.detailText, { color: C.textMuted }]}>{item.BathRoomCount} {item.BathRoomCount === 1 ? 'bath' : 'baths'}</Text>
+                        </View>
+                      )}
+                      
+                      {item.capacity !== undefined && (
+                        <View style={styles.detailItem}>
+                          <Ionicons name="people-outline" size={14} color={C.textMuted} />
+                          <Text style={[styles.detailText, { color: C.textMuted }]}>{item.capacity} {item.capacity === 1 ? 'guest' : 'guests'}</Text>
+                        </View>
+                      )}
+                    </View>
+                    
+                    <View style={styles.priceRow}>
+                      <Text style={[styles.rentLabel, { color: C.textMuted }]}>Rent</Text>
+                      {item.price !== undefined && (
+                        <Text style={[styles.priceText, { color: C.text }]}>
+                          <Text style={{ color: C.accent2, fontWeight: '800' }}>
+                            ${typeof item.price === 'number' ? item.price : parseInt(String(item.price).replace(/[^0-9]/g, '') || '0')}
+                          </Text>
+                          <Text style={{ fontSize: 12, color: C.textMuted }}> / month</Text>
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              </Animated.View>
+              ))}
+            </ScrollView>
+          )}
+        </>
+      )}
+
+      {/* New Hosts - Only show when search is not active */}
+      {!isSearchActive() && (
+        <>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: C.text }]}>New Hosts</Text>
+            <TouchableOpacity activeOpacity={0.7}><Text style={[styles.viewAll, { color: C.tint }]}>view all</Text></TouchableOpacity>
+          </View>
+          
+          {hostsLoading ? (
+            <View style={[styles.loadingContainer, { paddingVertical: 20 }]}>
+              <ActivityIndicator size="small" color={C.tint} />
+              <Text style={[styles.loadingText, { color: C.textMuted }]}>Loading hosts...</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={hosts}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={{ paddingHorizontal: 16 }}
+              renderItem={({ item }) => (
+                <TouchableOpacity 
+                  style={[styles.hostCard, { backgroundColor: C.surface, borderColor: C.surfaceBorder }]}
+                  activeOpacity={0.8}
+                  onPress={() => router.push({ pathname: '/host/[id]', params: { id: item.id } })}
+                > 
+                  {item.photoURL ? (
+                    <Image 
+                      source={{ uri: item.photoURL }} 
+                      style={styles.hostAvatar} 
+                    />
+                  ) : (
+                    <View style={[styles.hostAvatar, { backgroundColor: C.tint }]}>
+                      <Text style={styles.hostAvatarText}>{item.name.charAt(0).toUpperCase()}</Text>
+                    </View>
+                  )}
+                  
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.hostName, { color: C.text }]} numberOfLines={1}>{item.name}</Text>
+                    <View style={styles.hostRatingRow}>
+                      <Ionicons name="star" size={14} color="#FFD700" />
+                      <Text style={[styles.hostRating, { color: C.textMuted }]}>{item.rating}</Text>
+                      <Text style={[styles.hostListings, { color: C.textMuted }]}>· {item.listingsCount} listing{item.listingsCount !== 1 ? 's' : ''}</Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              )}
+            />
+          )}
+        </>
+      )}
 
       {/* Listings */}
       <View style={styles.sectionHeader}>
-        <Text style={[styles.sectionTitle, { color: C.text }]}>Listings</Text>
-        <TouchableOpacity activeOpacity={0.7}><Text style={[styles.viewAll, { color: C.tint }]}>View all</Text></TouchableOpacity>
+        <Text style={[styles.sectionTitle, { color: C.text }]}>{isSearchActive() ? 'Search Results' : 'Listings'}</Text>
+        {!isSearchActive() && (
+          <TouchableOpacity activeOpacity={0.7}><Text style={[styles.viewAll, { color: C.tint }]}>View all</Text></TouchableOpacity>
+        )}
       </View>
-      <View style={styles.grid}>
-        {filteredProperties.length === 0 ? (
+      
+      {isLoading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={C.tint} />
+          <Text style={[styles.loadingText, { color: C.textMuted }]}>Loading properties...</Text>
+        </View>
+      ) : filteredProperties.length === 0 ? (
+        <View style={styles.noResultsContainer}>
           <Text style={{ color: C.textMuted, paddingHorizontal: 16 }}>No properties found.</Text>
-        ) : (
-          filteredProperties.map((l) => (
+        </View>
+      ) : (
+        <View style={styles.grid}>
+          {filteredProperties.map((l) => (
             <TouchableOpacity 
               key={`grid-${l.id}`} 
               activeOpacity={0.9} 
               style={[styles.gridCard, { backgroundColor: C.surface, borderColor: C.surfaceBorder }]}
-              onPress={() => router.push({pathname: '/property/details', params: {id: l.id}})}> 
-              <RemoteImage uri={l.imageUrl ?? null} style={styles.gridPhoto} />
+              onPress={() => router.push(`/property/details?id=${l.id}`)}> 
+              <RemoteImage uri={l.imageUrl ?? null} style={styles.gridPhoto}>
+                {l.categories && (
+                  <View style={[styles.badgeSmall, { backgroundColor: '#3c95a6' }]}>
+                    <Text style={[styles.badgeTextSmall, { color: '#ffffff' }]}>{l.categories}</Text>
+                  </View>
+                )}
+              </RemoteImage>
               <Text numberOfLines={1} style={[styles.gridTitle, { color: C.text }]}>{String(l.title || 'Untitled')}</Text>
               <View style={styles.metaRow}>
                 <Ionicons name="location" size={14} color={C.icon} />
                 <Text style={[styles.metaText, { color: C.textMuted }]}>{getLocationDisplay(l)}</Text>
+                <TouchableOpacity style={styles.heartButtonSmall} activeOpacity={0.8}>
+                  <AntDesign name="heart" size={14} color="#3c95a6" />
+                </TouchableOpacity>
               </View>
-              <View style={[styles.gridLikeBubble, { backgroundColor: C.tint }]}>
-                <Ionicons name="heart-outline" size={12} color="#fff" />
+              
+              {/* Grid card details */}
+              <View style={styles.gridDetailsRow}>
+                {l.bedroomCount !== undefined && (
+                  <View style={styles.gridDetailItem}>
+                    <Ionicons name="bed-outline" size={12} color={C.textMuted} />
+                    <Text style={[styles.gridDetailText, { color: C.textMuted }]}>{l.bedroomCount}</Text>
+                  </View>
+                )}
+                
+                {l.BathRoomCount !== undefined && (
+                  <View style={styles.gridDetailItem}>
+                    <Ionicons name="water-outline" size={12} color={C.textMuted} />
+                    <Text style={[styles.gridDetailText, { color: C.textMuted }]}>{l.BathRoomCount}</Text>
+                  </View>
+                )}
+                
+                {l.capacity !== undefined && (
+                  <View style={styles.gridDetailItem}>
+                    <Ionicons name="people-outline" size={12} color={C.textMuted} />
+                    <Text style={[styles.gridDetailText, { color: C.textMuted }]}>{l.capacity}</Text>
+                  </View>
+                )}
+                
+                {l.price !== undefined && (
+                  <Text style={[styles.gridPrice, { color: C.accent2 }]}>
+                    ${typeof l.price === 'number' ? l.price : parseInt(String(l.price).replace(/[^0-9]/g, '') || '0')}
+                  </Text>
+                )}
               </View>
             </TouchableOpacity>
-          ))
-        )}
-      </View>
+          ))}
+        </View>
+      )}
 
-      <View style={{ height: 24 }} />
-    </ScrollView>
+      {/* Extra padding at bottom to account for floating tab bar */}
+      <View style={{ height: 30 }} />
+    </Animated.ScrollView>
 
     {/* Filter Modal */}
     <FilterModal
@@ -341,7 +996,70 @@ export default function Homepage() {
 
 const styles = StyleSheet.create({
   container: {
-    paddingTop: Platform.OS === 'ios' ? 60 : 82,
+    paddingTop: Platform.OS === 'ios' ? 60 : 30,
+    paddingBottom: Platform.OS === 'ios' ? 100 : 90, // Add padding for floating tab bar + safe area
+  },
+  // New styles for property details
+  detailsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    marginTop: 4,
+    gap: 8,
+  },
+  detailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(0,0,0,0.03)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  detailText: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  detailBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#0ea5e9',
+  },
+  badgeTextSmall: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  badgeSmall: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    position: 'absolute',
+    bottom: 8,
+    left: 8,
+  },
+  gridDetailsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+    gap: 6,
+    flexWrap: 'wrap',
+  },
+  gridDetailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  gridDetailText: {
+    fontSize: 10,
+    fontWeight: '500',
+  },
+  gridPrice: {
+    fontSize: 14,
+    fontWeight: '700',
+    marginLeft: 'auto',
   },
   headerRow: {
     paddingHorizontal: 16,
@@ -352,12 +1070,58 @@ const styles = StyleSheet.create({
   },
   heyText: {
     fontSize: 22,
-    fontWeight: '700',
+    fontWeight: '600',
+    marginHorizontal: 16,
   },
   avatar: {
-    height: 34,
-    width: 34,
-    borderRadius: 17,
+    height: 40,
+    width: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarText: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  heartButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 3,
+    marginLeft: 'auto',
+  },
+  heartButtonSmall: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+    marginLeft: 'auto',
+  },
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
+  },
+  rentLabel: {
+    fontSize: 12,
+    fontWeight: '500',
   },
   searchBar: {
     marginHorizontal: 16,
@@ -372,6 +1136,11 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     paddingHorizontal: 8,
+    height: 40,
+  },
+  clearButton: {
+    padding: 4,
+    marginRight: 4,
   },
   filterBtn: {
     height: 30,
@@ -380,25 +1149,82 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  chipsWrap: {
+  filtersContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
+  chipsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
+    marginBottom: 10,
+  },
+  clearFiltersBtn: {
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  clearFiltersBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: 16,
-    paddingTop: 12,
+    marginTop: 8,
+  },
+  resultsCount: {
+    fontSize: 14,
+  },
+  noResultsContainer: {
+    padding: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  noResultsTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  noResultsMessage: {
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  loadingContainer: {
+    padding: 32,
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 8,
+    fontSize: 14,
   },
   chip: {
-    paddingHorizontal: 14,
-    height: 34,
+    paddingHorizontal: 10,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 20,
     borderWidth: 1,
+    flex: 1,
+    minWidth: 95,
+    maxWidth: 115,
+    flexDirection: 'row',
+    gap: 4,
+  },
+  chipIcon: {
+    marginRight: 2,
   },
   chipText: {
-    fontWeight: '600',
+    fontWeight: '400',
+    fontSize: 12,
   },
   featuredRow: {
+    paddingVertical: 5,
     paddingHorizontal: 12,
     paddingTop: 14,
     gap: 10,
@@ -408,14 +1234,20 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     overflow: 'hidden',
-    marginHorizontal: 4,
+    marginHorizontal: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   photo: {
-    height: 120,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: '#e5e7eb',
+    height: 140,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
     justifyContent: 'flex-end',
     padding: 10,
+    overflow: 'hidden',
   },
   badge: {
     alignSelf: 'flex-start',
@@ -439,6 +1271,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    width: '100%',
   },
   metaText: {
     fontSize: 12,
@@ -447,16 +1280,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontWeight: '600',
   },
-  likeBubble: {
-    position: 'absolute',
-    top: 8,
-    left: 8,
-    height: 28,
-    width: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  // Removed likeBubble style as we're using heartButtonSmall instead
   sectionHeader: {
     paddingHorizontal: 16,
     paddingVertical: 14,
@@ -482,16 +1306,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   hostAvatar: {
-    height: 40,
-    width: 40,
-    borderRadius: 20,
-    marginRight: 10,
+    height: 50,
+    width: 50,
+    borderRadius: 25,
+    marginRight: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  hostAvatarText: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: 'bold',
   },
   hostName: {
     fontWeight: '700',
+    fontSize: 15,
+    marginBottom: 4,
   },
-  hostPrice: {
-    marginTop: 2,
+  hostRatingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  hostRating: {
+    fontSize: 13,
+  },
+  hostListings: {
+    fontSize: 13,
   },
   grid: {
     paddingHorizontal: 12,

@@ -1,9 +1,9 @@
+import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { Tabs } from 'expo-router';
 import React from 'react';
 
 import AuthGuard from '@/components/AuthGuard';
-import { HapticTab } from '@/components/haptic-tab';
-import { Colors } from '@/constants/theme';
+import { FloatingTabBar } from '@/components/floating-tab-bar';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,23 +16,10 @@ export default function TabLayout() {
   return (
     <AuthGuard>
       <Tabs
+        tabBar={(props: BottomTabBarProps) => <FloatingTabBar {...props} />}
         screenOptions={{
-          tabBarActiveTintColor: '#ffffff',
-          tabBarInactiveTintColor: 'rgba(255,255,255,0.85)',
           headerShown: false,
-          tabBarButton: HapticTab,
           tabBarHideOnKeyboard: true,
-          tabBarStyle: {
-            backgroundColor: Colors[colorScheme ?? 'light'].tint,
-            borderTopColor: 'transparent',
-            // Increase height and add bottom padding so it clears Android nav bar
-            height: 56 + extraBottom,
-            paddingBottom: extraBottom,
-            paddingTop: 6,
-          },
-          tabBarLabelStyle: {
-            fontWeight: '600',
-          },
         }}>
       <Tabs.Screen
         name="homepage"
@@ -42,7 +29,7 @@ export default function TabLayout() {
             <Ionicons
               name={focused ? "home" : "home-outline"}
               size={size ?? 24}
-              color={focused ? '#ffffff' : 'rgba(255,255,255,0.7)'}
+              color={color}
             />
           ),
         }}
@@ -55,7 +42,7 @@ export default function TabLayout() {
             <Ionicons
               name={focused ? "heart" : "heart-outline"}
               size={size ?? 24}
-              color={focused ? '#ffffff' : 'rgba(255,255,255,0.7)'}
+              color={color}
             />
           ),
         }}
@@ -68,7 +55,7 @@ export default function TabLayout() {
             <Ionicons
               name={focused ? "chatbubble" : "chatbubble-outline"}
               size={size ?? 24}
-              color={focused ? '#ffffff' : 'rgba(255,255,255,0.7)'}
+              color={color}
             />
           ),
         }}
@@ -81,7 +68,7 @@ export default function TabLayout() {
             <Ionicons
               name={focused ? "settings" : "settings-outline"}
               size={size ?? 24}
-              color={focused ? '#ffffff' : 'rgba(255,255,255,0.7)'}
+              color={color}
             />
           ),
         }}

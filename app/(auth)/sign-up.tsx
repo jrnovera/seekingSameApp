@@ -1,13 +1,34 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, TouchableOpacity, useColorScheme, Platform, ScrollView, Alert, ActivityIndicator } from 'react-native';
-import { Ionicons, AntDesign } from '@expo/vector-icons';
+import { AntDesign, Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import React, { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Animated, Image, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 
 export default function SignUpScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const { signUp } = useAuth();
+  
+  // Animation values
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.9)).current;
+  
+  // Start entrance animation when component mounts
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true
+      }),
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        friction: 8,
+        tension: 40,
+        useNativeDriver: true
+      })
+    ]).start();
+  }, []);
 
   const [formData, setFormData] = useState({
     displayName: '',
@@ -55,8 +76,27 @@ export default function SignUpScreen() {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-      <View style={[styles.card, isDark && styles.cardDark]}>
+    <ScrollView contentContainerStyle={[styles.scroll, isDark && styles.scrollDark]} keyboardShouldPersistTaps="handled">
+        {/* Logo Image with enhanced presentation and animation */}
+        <View style={styles.logoContainer}>
+          <Animated.View 
+            style={[
+              styles.logoWrapper,
+              { 
+                opacity: fadeAnim,
+                transform: [{ scale: scaleAnim }]
+              }
+            ]}
+          >
+            <Image 
+              source={require('../../assets/images/Logo2.jpg')} 
+              style={styles.logoImage}
+              resizeMode="cover"
+              
+            />
+          </Animated.View>
+        </View>
+        
         <Text style={[styles.title, isDark && styles.titleDark]}>Get Started</Text>
         <Text style={styles.subtitle}>Let's get started by filling out the form below.</Text>
 
@@ -145,7 +185,6 @@ export default function SignUpScreen() {
             <Text style={styles.metaText}>Already have an account? <Text style={styles.linkHighlight}>Login</Text></Text>
           </TouchableOpacity>
         </View>
-      </View>
     </ScrollView>
   );
 }
@@ -153,10 +192,12 @@ export default function SignUpScreen() {
 const styles = StyleSheet.create({
   scroll: {
     flexGrow: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
     padding: 20,
     backgroundColor: '#f6f7fb',
+    alignItems: 'center',
+  },
+  scrollDark: {
+    backgroundColor: '#0b0f1a',
   },
   metaText: {
     color: '#6b7280',
@@ -168,26 +209,38 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   bottomTextBlock: {
-    
     marginTop: 16,
-    marginHorizontal: 18,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     gap: 8,
   },
-  card: {
+  logoContainer: {
+    height: 200,
     width: '100%',
-    maxWidth: 420,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+    marginBottom: 20,
+  },
+  logoWrapper: {
+    height: 140,
+    width: '85%',
+    maxWidth: 400,
+    borderRadius: 12,
+    overflow: 'hidden',
     backgroundColor: '#ffffff',
-    borderRadius: 16,
-    paddingVertical: 28,
-    paddingHorizontal: 18,
     shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowOffset: { width: 0, height: 10 },
-    shadowRadius: 20,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    padding: 10,
+  },
+  logoImage: {
+    height: '100%',
+    width: '100%',
+    
   },
   cardDark: {
     backgroundColor: '#0b0f1a',
@@ -216,6 +269,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderWidth: 1,
     borderColor: '#eef0f6',
+    width: '100%',
+    maxWidth: 400,
   },
   input: {
     fontSize: 16,
@@ -245,6 +300,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
     shadowRadius: 12,
     elevation: 4,
+    paddingHorizontal: 18,
   },
   primaryButtonText: {
     color: 'white',

@@ -1,12 +1,16 @@
 import { AntDesign, Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Animated, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 
 export default function SignInScreen() {
   const isDark = useColorScheme() === 'dark';
   const { signIn } = useAuth();
+
+  // Animation values
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.9)).current;
 
   const [formData, setFormData] = useState({
     email: '',
@@ -14,6 +18,23 @@ export default function SignInScreen() {
   });
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  
+  // Start entrance animation when component mounts
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true
+      }),
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        friction: 8,
+        tension: 40,
+        useNativeDriver: true
+      })
+    ]).start();
+  }, []);
 
   const handleSignIn = async () => {
     if (!formData.email.trim()) {
@@ -42,12 +63,24 @@ export default function SignInScreen() {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-      <View style={[styles.card, isDark && styles.cardDark]}>
-        {/* Header Placeholder */}
-        <View style={styles.headerPlaceholder}>
-          <AntDesign name="picture" size={28} color="#9ca3af" />
-          <Text style={styles.placeholderText}>Header Image</Text>
+    <ScrollView contentContainerStyle={[styles.scroll, isDark && styles.scrollDark]} keyboardShouldPersistTaps="handled">
+        {/* Logo Image with enhanced presentation and animation */}
+        <View style={styles.headerContainer}>
+          <Animated.View 
+            style={[
+              styles.logoWrapper,
+              { 
+                opacity: fadeAnim,
+                transform: [{ scale: scaleAnim }]
+              }
+            ]}
+          >
+            <Image 
+              source={require('../../assets/images/Compass.jpg')} 
+              style={styles.logoImage}
+              resizeMode="cover"
+            />
+          </Animated.View>
         </View>
 
         <Text style={[styles.heading, isDark && styles.headingDark]}>Let's <Text style={styles.accent}>Sign In</Text></Text>
@@ -123,7 +156,7 @@ export default function SignInScreen() {
             <AntDesign name="google" size={20} color="#db4437" />
           </TouchableOpacity>
           <TouchableOpacity style={[styles.socialPill]} activeOpacity={0.9}>
-            <AntDesign name="facebook" size={20} color="#1877f2" />
+            <AntDesign name="apple" size={20} color="#1877f2" />
           </TouchableOpacity>
         </View>
 
@@ -134,7 +167,6 @@ export default function SignInScreen() {
           </TouchableOpacity>
          
         </View>
-      </View>
     </ScrollView>
   );
 }
@@ -142,40 +174,38 @@ export default function SignInScreen() {
 const styles = StyleSheet.create({
   scroll: {
     flexGrow: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
     padding: 20,
     backgroundColor: '#f6f7fb',
+    alignItems: 'center',
   },
-  card: {
-    width: '100%',
-    maxWidth: 420,
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    paddingBottom: 24,
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowOffset: { width: 0, height: 10 },
-    shadowRadius: 20,
-    elevation: 6,
-    overflow: 'hidden',
-  },
-  cardDark: {
+  scrollDark: {
     backgroundColor: '#0b0f1a',
   },
-  headerPlaceholder: {
-    height: 120,
+  headerContainer: {
+    height: 180,
     width: '100%',
-    backgroundColor: '#f1f5f9',
     alignItems: 'center',
     justifyContent: 'center',
-    borderBottomWidth: 1,
-    borderColor: '#eef0f6',
+    marginBottom: 20,
+    paddingVertical: 5,
   },
-  placeholderText: {
-    marginTop: 6,
-    fontSize: 12,
-    color: '#9ca3af',
+  logoWrapper: {
+    height: 140,
+    width: '85%',
+    maxWidth: 400,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#ffffff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    padding: 10,
+  },
+  logoImage: {
+    height: '100%',
+    width: '100%',
   },
   heading: {
     fontSize: 26,
@@ -197,10 +227,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    marginHorizontal: 18,
     marginTop: 12,
     borderWidth: 1,
     borderColor: '#eef0f6',
+    width: '100%',
+    maxWidth: 400,
   },
   input: {
     fontSize: 16,
@@ -240,6 +271,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
     shadowRadius: 12,
     elevation: 4,
+    paddingHorizontal: 30,
   },
   primaryButtonText: {
     color: 'white',
@@ -266,6 +298,7 @@ const styles = StyleSheet.create({
     color: '#9ca3af',
   },
   socialRow: {
+    gap: 10,
     marginTop: 14,
     paddingHorizontal: 18,
     flexDirection: 'row',

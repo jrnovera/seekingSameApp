@@ -1,20 +1,110 @@
-import React from 'react';
-import { StyleSheet, Text, View, ScrollView, useColorScheme, ActivityIndicator } from 'react-native';
-import { Colors } from '@/constants/theme';
-import { Ionicons, AntDesign } from '@expo/vector-icons';
 import RemoteImage from '@/components/remote-image';
-import { Favorite } from '@/types/favorite';
-import { listenFavoritesByUser } from '@/services/favoriteService';
-import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/config/firebase';
+import { Colors } from '@/constants/theme';
+import { listenFavoritesByUser, removeFavorite } from '@/services/favoriteService';
+import { Favorite } from '@/types/favorite';
+import { AntDesign, Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import { onAuthStateChanged } from 'firebase/auth';
+import React, { useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Animated,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  useColorScheme,
+  View,
+} from 'react-native';
 
 export default function Favorites() {
   const scheme = useColorScheme() ?? 'light';
   const C = Colors[scheme];
 
-  const [favorites, setFavorites] = React.useState<Favorite[]>([]);
-  const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
+  const [favorites, setFavorites] = useState<Favorite[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  
+  // Animation references
+  const fadeAnim = useRef<{[key: string]: Animated.Value}>({});
+
+  // Handle removing a favorite with animation
+  const handleRemoveFavorite = (favorite: Favorite) => {
+    // Ask for confirmation
+    Alert.alert(
+      "Remove Favorite",
+      `Are you sure you want to remove "${favorite.title || 'this property'}" from your favorites?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Remove", 
+          style: "destructive",
+          onPress: () => confirmRemoveFavorite(favorite)
+        }
+      ]
+    );
+  };
+
+  // Confirm and remove the favorite with animation
+  const confirmRemoveFavorite = async (favorite: Favorite) => {
+    try {
+      setRemovingId(favorite.id);
+      
+      // Create parallel animations for a more engaging effect
+      Animated.parallel([
+        // Fade out
+        Animated.timing(fadeAnim.current[favorite.id], {
+          toValue: 0,
+          duration: 400,
+          useNativeDriver: true
+        }),
+        // Scale down
+        Animated.timing(fadeAnim.current[`${favorite.id}_scale`], {
+          toValue: 0.8,
+          duration: 300,
+          useNativeDriver: true
+        })
+      ]).start(async () => {
+        // After animation completes, remove from database
+        await removeFavorite(favorite.id);
+        
+        // Show success message with a nice checkmark icon
+        Alert.alert(
+          "Success ✓", 
+          `"${favorite.title || 'Property'}" has been removed from your favorites.`,
+          [{ text: "OK" }]
+        );
+        
+        setRemovingId(null);
+      });
+    } catch (error) {
+      console.error('Error removing favorite:', error);
+      Alert.alert("Error", "Failed to remove from favorites. Please try again.");
+      setRemovingId(null);
+      
+      // Reset animations if there was an error
+      if (fadeAnim.current[favorite.id]) {
+        fadeAnim.current[favorite.id].setValue(1);
+      }
+      if (fadeAnim.current[`${favorite.id}_scale`]) {
+        fadeAnim.current[`${favorite.id}_scale`].setValue(1);
+      }
+    }
+  };
+
+  // Initialize animation values for new favorites
+  React.useEffect(() => {
+    favorites.forEach(fav => {
+      if (!fadeAnim.current[fav.id]) {
+        fadeAnim.current[fav.id] = new Animated.Value(1);
+        fadeAnim.current[`${fav.id}_scale`] = new Animated.Value(1);
+      }
+    });
+  }, [favorites]);
 
   React.useEffect(() => {
     // Holder for the Firestore unsubscribe function to allow cleanup on auth change
@@ -79,8 +169,26 @@ export default function Favorites() {
       )}
 
       {favorites.map((item) => (
-        <View key={item.id} style={[styles.card, { backgroundColor: C.surface, borderColor: C.surfaceBorder }]}> 
-          <View style={{ flexDirection: 'row' }}>
+        <Animated.View 
+          key={item.id} 
+          style={[
+            styles.card, 
+            { 
+              backgroundColor: C.surface, 
+              borderColor: C.surfaceBorder,
+              opacity: fadeAnim.current[item.id] || 1,
+              transform: [{
+                scale: fadeAnim.current[`${item.id}_scale`] || 1
+              }]
+            }
+          ]}
+        > 
+          <TouchableOpacity 
+            style={{ flex: 1 }}
+            onPress={() => item.propertyId && router.push(`/property/${item.propertyId}`)}
+            activeOpacity={0.7}
+          >
+            <View style={{ flexDirection: 'row' }}>
             {/* Image with badge */}
             <View style={{ width: 150 }}>
               <RemoteImage uri={item.imageUrl ?? null} style={styles.photo} borderRadius={16}>
@@ -89,9 +197,17 @@ export default function Favorites() {
                 </View>
               </RemoteImage>
               {/* Remove bubble */}
-              <View style={[styles.removeBubble, { backgroundColor: C.tint }]}> 
-                <AntDesign name="close" size={12} color="#fff" />
-              </View>
+              <TouchableOpacity 
+                style={[styles.removeBubble, { backgroundColor: C.tint }]}
+                onPress={() => handleRemoveFavorite(item)}
+                disabled={removingId === item.id}
+              > 
+                {removingId === item.id ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <AntDesign name="close" size={12} color="#fff" />
+                )}
+              </TouchableOpacity>
             </View>
 
             {/* Details */}
@@ -105,7 +221,8 @@ export default function Favorites() {
               <Text style={[styles.price, { color: C.accent2, fontWeight: '800' }]}>{typeof item.price === 'number' ? `$${item.price}` : (item.price ? `$${item.price}` : '$0')}</Text>
             </View>
           </View>
-        </View>
+          </TouchableOpacity>
+        </Animated.View>
       ))}
 
       <View style={{ height: 24 }} />
@@ -115,8 +232,8 @@ export default function Favorites() {
 
 const styles = StyleSheet.create({
   container: {
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
     paddingHorizontal: 12,
-    paddingTop: 12,
     flexGrow: 1,
   },
   title: {
