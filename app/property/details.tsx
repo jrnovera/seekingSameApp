@@ -3,11 +3,16 @@ import { auth, db } from '@/config/firebase';
 import { Colors } from '@/constants/theme';
 import { FontAwesome, Ionicons, MaterialCommunityIcons, MaterialIcons, Entypo } from '@expo/vector-icons';
 import * as Linking from 'expo-linking';
+import * as WebBrowser from 'expo-web-browser';
 import { router, useLocalSearchParams } from 'expo-router';
 import { addDoc, collection, deleteDoc, doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, useColorScheme, View } from 'react-native';
 import { createFavorite, checkIfFavorited, removeFavorite } from '@/services/favoriteService';
+import { paymentService } from '@/services/paymentService';
+import conversationService from '@/services/conversationService';
+import reviewService, { Review } from '@/services/reviewService';
+import ReviewModal from '@/components/ReviewModal';
 
 type Property = {
   id: string;
@@ -37,14 +42,6 @@ type Property = {
   rating?: number;
 };
 
-type Review = {
-  id: string;
-  userName: string;
-  userAvatar?: string;
-  rating: number;
-  comment: string;
-  date: string;
-};
 
 export default function PropertyDetails() {
   const { id } = useLocalSearchParams();
@@ -57,6 +54,11 @@ export default function PropertyDetails() {
   const [favoriteDocId, setFavoriteDocId] = useState<string | null>(null);
   const [currentImage, setCurrentImage] = useState<string | null>(null);
   const [allPhotos, setAllPhotos] = useState<string[]>([]);
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [hasUserReviewed, setHasUserReviewed] = useState(false);
+  const [averageRating, setAverageRating] = useState(0);
+  const [totalReviews, setTotalReviews] = useState(0);
   const scheme = useColorScheme() ?? 'light';
   const C = Colors[scheme as 'light' | 'dark'];
 
@@ -119,85 +121,378 @@ export default function PropertyDetails() {
 
   // Handle chat button press
   const handleChatPress = async () => {
-    if (!auth.currentUser || !property?.createdby) {
+    if (!auth.currentUser) {
       Alert.alert('Sign In Required', 'Please sign in to start a chat with the property owner.');
       return;
     }
 
+    if (!property?.createdby) {
+      Alert.alert('Error', 'Property owner information is not available.');
+      console.error('Invalid property.createdby:', property?.createdby);
+      return;
+    }
+
+    // Extract user ID from Firebase DocumentReference
+    let hostUserId: string;
+    console.log('Processing property.createdby:', property.createdby);
+    console.log('Type of property.createdby:', typeof property.createdby);
+
+    if (typeof property.createdby === 'string') {
+      hostUserId = property.createdby;
+    } else if (property.createdby && typeof property.createdby === 'object') {
+      // Cast to any to access DocumentReference properties
+      const createdByRef = property.createdby as any;
+
+      // Try different ways to extract the user ID from DocumentReference
+      if (createdByRef.referencePath) {
+        hostUserId = createdByRef.referencePath.split('/')[1];
+        console.log('Extracted host user ID from referencePath:', hostUserId);
+      } else if (createdByRef.path) {
+        hostUserId = createdByRef.path.split('/')[1];
+        console.log('Extracted host user ID from path:', hostUserId);
+      } else if (createdByRef.id) {
+        hostUserId = createdByRef.id;
+        console.log('Extracted host user ID from id:', hostUserId);
+      } else {
+        // Log all available properties to debug
+        console.log('Available properties on createdby object:', Object.keys(createdByRef));
+        Alert.alert('Error', 'Cannot extract user ID from property owner reference.');
+        return;
+      }
+    } else {
+      Alert.alert('Error', 'Property owner information format is invalid.');
+      console.error('Unsupported property.createdby format:', property?.createdby);
+      return;
+    }
+
+    if (auth.currentUser.uid === hostUserId) {
+      Alert.alert('Info', 'You cannot chat with yourself on your own property.');
+      return;
+    }
+
     try {
-      // Check if chat already exists between these users
-      const chatRef = collection(db, 'chat');
-      
-      // Create a new chat document
-      const newChatRef = await addDoc(chatRef, {
-        userAuth: auth.currentUser.uid,
-        otherUser: property.createdby,
-        lastMessage: `Inquiry about ${property.title}`,
-        messageTime: serverTimestamp(),
-        user: auth.currentUser.uid,
-        propertyCreatedBy: property.createdby
-      });
-      
-      // Navigate to the chat screen
-      router.push(`/conversation/${newChatRef.id}`);
-      
+      console.log('Creating conversation between:', auth.currentUser.uid, 'and', hostUserId);
+
+      // Get user info for both participants
+      const [currentUserDoc, hostUserDoc] = await Promise.all([
+        getDoc(doc(db, 'users', auth.currentUser.uid)),
+        getDoc(doc(db, 'users', hostUserId))
+      ]);
+
+      const currentUserData = currentUserDoc.exists() ? currentUserDoc.data() : {};
+      const hostUserData = hostUserDoc.exists() ? hostUserDoc.data() : {};
+
+      console.log('Current user data:', currentUserData);
+      console.log('Host user data:', hostUserData);
+
+      // Create or get existing conversation
+      const conversation = await conversationService.getOrCreateConversation(
+        hostUserId, // hostId
+        auth.currentUser.uid, // userId
+        property.id || 'unknown', // propertyId
+        property.title || 'Property', // propertyTitle
+        {
+          uid: auth.currentUser.uid,
+          email: currentUserData.email || '',
+          display_name: currentUserData.display_name || currentUserData.name || 'User'
+        },
+        {
+          uid: hostUserId,
+          email: hostUserData.email || '',
+          display_name: hostUserData.display_name || hostUserData.name || 'Host'
+        }
+      );
+
+      // Navigate to the conversation screen
+      router.push(`/conversation/${conversation.id}`);
+
     } catch (error) {
-      console.error('Error creating chat:', error);
+      console.error('Error creating conversation:', error);
       Alert.alert('Error', 'Failed to start chat. Please try again.');
     }
   };
 
   // Handle rent button press
-  const handleRentPress = () => {
-    Alert.alert(
-      'Proceed to Payment',
-      `Would you like to rent "${property?.title}" for ${typeof property?.price === 'number' ? `$${property?.price}` : property?.price} per month?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Proceed', 
-          onPress: () => {
-            // Here you would integrate with Stripe
-            Alert.alert('Stripe Integration', 'Stripe payment would launch here.');
-            // When you have Stripe SDK integrated:
-            // router.push('/payment/checkout?propertyId=' + property?.id);
-          }
+  const handleRentPress = async () => {
+    if (!auth.currentUser || !property) {
+      Alert.alert('Sign In Required', 'Please sign in to rent this property.');
+      return;
+    }
+
+    if (paymentLoading) return;
+
+    try {
+      setPaymentLoading(true);
+
+      // Calculate amount in cents for Stripe
+      let amount = 0;
+      if (typeof property.price === 'number') {
+        amount = property.price * 100; // Convert to cents
+      } else if (typeof property.price === 'string') {
+        // Extract number from string (remove $ and other characters)
+        const priceNumber = parseFloat(property.price.replace(/[^0-9.]/g, ''));
+        if (!isNaN(priceNumber)) {
+          amount = priceNumber * 100; // Convert to cents
         }
-      ]
-    );
+      }
+
+      if (amount < 50) { // Minimum 50 cents for Stripe
+        Alert.alert('Invalid Amount', 'The property price seems to be invalid. Please contact the property owner.');
+        return;
+      }
+
+      Alert.alert(
+        'Proceed to Payment',
+        `Would you like to rent "${property.title}" for ${typeof property.price === 'number' ? `$${property.price}` : property.price} per month?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Proceed',
+            onPress: async () => {
+              try {
+                // Create mobile checkout session
+                const response = await paymentService.createMobileCheckout({
+                  amount: amount,
+                  propertyTitle: property.title || 'Property Rental',
+                  propertyId: property.id,
+                  currency: 'usd',
+                  metadata: {
+                    propertyId: property.id,
+                    propertyTitle: property.title || '',
+                    location: getLocationDisplay(property),
+                    bedrooms: property.bedrooms?.toString() || '',
+                    bathrooms: property.bathrooms?.toString() || ''
+                  }
+                });
+
+                // Start background polling immediately after creating session
+                const pollPaymentStatus = async () => {
+                  let attempts = 0;
+                  const maxAttempts = 60; // Poll for up to 2 minutes
+                  const intervalMs = 2000; // Check every 2 seconds
+
+                  const pollInterval = setInterval(async () => {
+                    try {
+                      attempts++;
+                      const statusResponse = await paymentService.getPaymentStatus(response.data.sessionId);
+
+                      if (statusResponse.data.paymentStatus === 'succeeded') {
+                        clearInterval(pollInterval);
+                        console.log('🎉 Payment succeeded! Preparing to navigate...');
+
+                        // Start background navigation immediately
+                        const navigationPromise = new Promise((resolve) => {
+                          setTimeout(() => {
+                            router.push({
+                              pathname: '/payment-success',
+                              params: {
+                                sessionId: statusResponse.data.sessionId,
+                                propertyTitle: statusResponse.data.propertyTitle,
+                                amount: statusResponse.data.amount.toString(),
+                                currency: statusResponse.data.currency,
+                                propertyId: statusResponse.data.propertyId
+                              }
+                            });
+                            resolve(true);
+                          }, 0); // Navigate immediately in background
+                        });
+
+                        // Wait 1 second (hidden from user) then close browser
+                        setTimeout(async () => {
+                          console.log('⏰ 1-second delay complete, closing browser...');
+                          await navigationPromise; // Ensure navigation started
+                          WebBrowser.dismissBrowser();
+                        }, 1000); // 1 second hidden delay
+
+                        return;
+                      }
+
+                      if (statusResponse.data.paymentStatus === 'failed') {
+                        clearInterval(pollInterval);
+                        console.log('❌ Payment failed! Preparing to navigate...');
+
+                        // Start background navigation immediately
+                        const navigationPromise = new Promise((resolve) => {
+                          setTimeout(() => {
+                            router.push({
+                              pathname: '/payment-failed',
+                              params: {
+                                sessionId: statusResponse.data.sessionId,
+                                propertyTitle: statusResponse.data.propertyTitle,
+                                amount: statusResponse.data.amount.toString(),
+                                currency: statusResponse.data.currency,
+                                propertyId: statusResponse.data.propertyId,
+                                errorMessage: 'Payment was declined or failed'
+                              }
+                            });
+                            resolve(true);
+                          }, 0); // Navigate immediately in background
+                        });
+
+                        // Wait 1 second (hidden from user) then close browser
+                        setTimeout(async () => {
+                          console.log('⏰ 1-second delay complete, closing browser...');
+                          await navigationPromise; // Ensure navigation started
+                          WebBrowser.dismissBrowser();
+                        }, 1000); // 1 second hidden delay
+
+                        return;
+                      }
+
+                      if (attempts >= maxAttempts) {
+                        clearInterval(pollInterval);
+                        // Close browser if still open
+                        WebBrowser.dismissBrowser();
+                        // Navigate to failed screen with timeout message
+                        router.push({
+                          pathname: '/payment-failed',
+                          params: {
+                            sessionId: response.data.sessionId,
+                            propertyTitle: response.data.propertyTitle,
+                            amount: response.data.amount.toString(),
+                            currency: response.data.currency,
+                            propertyId: response.data.propertyId,
+                            errorMessage: 'Payment is taking longer than expected. Please check your payment status.'
+                          }
+                        });
+                      }
+                    } catch (error) {
+                      console.error('Error polling payment status:', error);
+                      // Continue polling on error
+                    }
+                  }, intervalMs);
+
+                  return pollInterval;
+                };
+
+                // Start polling
+                const pollInterval = await pollPaymentStatus();
+
+                // Open Stripe Checkout in in-app browser modal
+                const result = await WebBrowser.openBrowserAsync(response.data.url, {
+                  presentationStyle: WebBrowser.WebBrowserPresentationStyle.FORM_SHEET, // iOS modal style
+                  controlsColor: '#3c95a6', // Match your app's theme
+                  toolbarColor: '#ffffff',
+                  showTitle: true,
+                  enableBarCollapsing: false,
+                  showInRecents: false,
+                  readerMode: false,
+                  dismissButtonStyle: 'close',
+                });
+
+                // If user manually closed browser before polling completed
+                if (pollInterval && result.type === 'dismiss') {
+                  clearInterval(pollInterval);
+                  // Navigate to processing screen as fallback
+                  router.push({
+                    pathname: '/payment-processing',
+                    params: {
+                      sessionId: response.data.sessionId,
+                      propertyTitle: response.data.propertyTitle,
+                      amount: response.data.amount.toString(),
+                      currency: response.data.currency,
+                      propertyId: response.data.propertyId
+                    }
+                  });
+                }
+              } catch (error) {
+                console.error('Payment initiation error:', error);
+                Alert.alert(
+                  'Payment Error',
+                  error instanceof Error ? error.message : 'Failed to initiate payment. Please try again.'
+                );
+              }
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Rent button error:', error);
+      Alert.alert('Error', 'Failed to process payment request. Please try again.');
+    } finally {
+      setPaymentLoading(false);
+    }
   };
 
-  // Generate sample reviews
-  const generateSampleReviews = () => {
-    return [
-      {
-        id: '1',
-        userName: 'Sarah Johnson',
-        rating: 5,
-        comment: 'Absolutely loved this place! Great location, clean, and the host was very responsive. Would definitely stay here again.',
-        date: '2 weeks ago'
-      },
-      {
-        id: '2',
-        userName: 'Michael Chen',
-        rating: 4,
-        comment: 'Nice property with good amenities. The neighborhood is quiet and safe. Only issue was the slow WiFi.',
-        date: '1 month ago'
-      },
-      {
-        id: '3',
-        userName: 'Jessica Williams',
-        rating: 5,
-        comment: 'Perfect for my needs. Close to public transportation and restaurants. Very clean and well-maintained.',
-        date: '2 months ago'
-      }
-    ];
-  };
 
   // Handle see all reviews
   const handleSeeAllReviews = () => {
     // Navigate to the reviews page with the property ID
     router.push(`/property/reviews?id=${property?.id}`);
+  };
+
+  // Handle add review button press
+  const handleAddReview = async () => {
+    if (!auth.currentUser) {
+      Alert.alert('Sign In Required', 'Please sign in to leave a review.');
+      return;
+    }
+
+    if (!property?.id) {
+      Alert.alert('Error', 'Property information is not available.');
+      return;
+    }
+
+    if (hasUserReviewed) {
+      Alert.alert('Already Reviewed', 'You have already left a review for this property.');
+      return;
+    }
+
+    setShowReviewModal(true);
+  };
+
+  // Load reviews for the property
+  const loadReviews = async (propertyId: string) => {
+    try {
+      const unsubscribe = reviewService.subscribeToPropertyReviews(propertyId, (reviewsList) => {
+        setReviews(reviewsList);
+        setTotalReviews(reviewsList.length);
+
+        if (reviewsList.length > 0) {
+          const totalRating = reviewsList.reduce((sum, review) => sum + review.rating, 0);
+          const avgRating = totalRating / reviewsList.length;
+          setAverageRating(Math.round(avgRating * 10) / 10);
+        } else {
+          setAverageRating(0);
+        }
+
+        // Check if current user has reviewed this property
+        if (auth.currentUser) {
+          const hasReviewed = reviewsList.some(review => review.userId === auth.currentUser!.uid);
+          setHasUserReviewed(hasReviewed);
+        }
+      });
+
+      return unsubscribe;
+    } catch (error) {
+      console.error('Error loading reviews:', error);
+      setReviews([]);
+      setTotalReviews(0);
+      setAverageRating(0);
+    }
+  };
+
+  // Check if current user has reviewed this property
+  const checkUserReviewStatus = async (propertyId: string) => {
+    if (!auth.currentUser) {
+      setHasUserReviewed(false);
+      return;
+    }
+
+    try {
+      const hasReviewed = await reviewService.hasUserReviewedProperty(auth.currentUser.uid, propertyId);
+      setHasUserReviewed(hasReviewed);
+    } catch (error) {
+      console.error('Error checking user review status:', error);
+      setHasUserReviewed(false);
+    }
+  };
+
+  // Handle review added callback
+  const handleReviewAdded = () => {
+    // Reviews will be updated automatically via the subscription
+    // The hasUserReviewed state will also be updated in the loadReviews callback
+    console.log('Review added successfully');
   };
 
   // Render star rating
@@ -369,9 +664,9 @@ export default function PropertyDetails() {
             rating: data.rating ?? 4.7,
           });
           
-          // Set sample reviews
-          setReviews(generateSampleReviews());
-          
+          // Load reviews for this property (this also checks user review status)
+          loadReviews(propertySnap.id);
+
           // Check if this property is in user's favorites
           checkIfFavorite();
         } else {
@@ -629,41 +924,72 @@ export default function PropertyDetails() {
           <View style={styles.reviewsHeader}>
             <Text style={[styles.sectionTitle, { color: C.text }]}>Reviews</Text>
             <View style={styles.ratingContainer}>
-              {renderStars(property.rating || 4.7)}
-              <Text style={[styles.ratingText, { color: C.text }]}>
-                {property.rating?.toFixed(1) || '4.7'} ({reviews.length})
-              </Text>
+              {averageRating > 0 ? (
+                <>
+                  {renderStars(averageRating)}
+                  <Text style={[styles.ratingText, { color: C.text }]}>
+                    {averageRating.toFixed(1)} ({totalReviews})
+                  </Text>
+                </>
+              ) : (
+                <Text style={[styles.ratingText, { color: C.textMuted }]}>No reviews yet</Text>
+              )}
             </View>
           </View>
-          
-          {reviews.slice(0, 2).map((review) => (
-            <View key={review.id} style={[styles.reviewItem, { borderBottomColor: C.surfaceBorder }]}>
-              <View style={styles.reviewHeader}>
-                <View style={styles.reviewUser}>
-                  <View style={[styles.reviewAvatar, { backgroundColor: '#3c95a6' }]}>
-                    <Text style={styles.reviewAvatarText}>{review.userName.charAt(0)}</Text>
-                  </View>
-                  <View>
-                    <Text style={[styles.reviewUserName, { color: C.text }]}>{review.userName}</Text>
-                    <View style={styles.reviewRating}>
-                      {renderStars(review.rating)}
-                      <Text style={[styles.reviewDate, { color: C.textMuted }]}>{review.date}</Text>
+
+          {/* Add Review Button */}
+          {auth.currentUser && !hasUserReviewed && (
+            <TouchableOpacity
+              style={[styles.addReviewButton, { backgroundColor: '#3c95a6' }]}
+              onPress={handleAddReview}
+            >
+              <Ionicons name="star-outline" size={20} color="#fff" />
+              <Text style={styles.addReviewButtonText}>Write a Review</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Reviews List */}
+          {reviews.length > 0 ? (
+            <>
+              {reviews.slice(0, 2).map((review) => (
+                <View key={review.id} style={[styles.reviewItem, { borderBottomColor: C.surfaceBorder }]}>
+                  <View style={styles.reviewHeader}>
+                    <View style={styles.reviewUser}>
+                      <View style={[styles.reviewAvatar, { backgroundColor: '#3c95a6' }]}>
+                        <Text style={styles.reviewAvatarText}>{review.userName.charAt(0).toUpperCase()}</Text>
+                      </View>
+                      <View>
+                        <Text style={[styles.reviewUserName, { color: C.text }]}>{review.userName}</Text>
+                        <View style={styles.reviewRating}>
+                          {renderStars(review.rating)}
+                          <Text style={[styles.reviewDate, { color: C.textMuted }]}>
+                            {reviewService.formatReviewDate(review.timestamp)}
+                          </Text>
+                        </View>
+                      </View>
                     </View>
                   </View>
+                  <Text style={[styles.reviewComment, { color: C.textMuted }]}>{review.comment}</Text>
                 </View>
-              </View>
-              <Text style={[styles.reviewComment, { color: C.textMuted }]}>{review.comment}</Text>
+              ))}
+
+              {reviews.length > 2 && (
+                <TouchableOpacity
+                  style={styles.seeAllButton}
+                  onPress={handleSeeAllReviews}
+                >
+                  <Text style={[styles.seeAllText, { color: '#3c95a6' }]}>See All Reviews ({reviews.length})</Text>
+                  <Ionicons name="chevron-forward" size={16} color="#3c95a6" />
+                </TouchableOpacity>
+              )}
+            </>
+          ) : (
+            <View style={styles.noReviewsContainer}>
+              <Ionicons name="chatbubbles-outline" size={48} color={C.textMuted} />
+              <Text style={[styles.noReviewsText, { color: C.textMuted }]}>
+                No reviews yet. Be the first to review this property!
+              </Text>
             </View>
-          ))}
-          
-          {reviews.length > 2 && (
-            <TouchableOpacity 
-              style={styles.seeAllButton}
-              onPress={handleSeeAllReviews}
-            >
-              <Text style={[styles.seeAllText, { color: '#3c95a6' }]}>See All Reviews</Text>
-              <Ionicons name="chevron-forward" size={16} color="#3c95a6" />
-            </TouchableOpacity>
           )}
         </View>
       </View>
@@ -678,14 +1004,35 @@ export default function PropertyDetails() {
           <Text style={[styles.chatButtonText, { color: C.tint }]}>Chat & Inquire</Text>
         </TouchableOpacity>
         
-        <TouchableOpacity 
-          style={[styles.rentButton, { backgroundColor: C.tint }]}
+        <TouchableOpacity
+          style={[styles.rentButton, { backgroundColor: paymentLoading ? C.surfaceSoft : C.tint }]}
           onPress={handleRentPress}
+          disabled={paymentLoading}
         >
-          <MaterialIcons name="payment" size={20} color="#fff" />
-          <Text style={styles.rentButtonText}>Rent Now</Text>
+          {paymentLoading ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <MaterialIcons name="payment" size={20} color="#fff" />
+          )}
+          <Text style={styles.rentButtonText}>
+            {paymentLoading ? 'Processing...' : 'Rent Now'}
+          </Text>
         </TouchableOpacity>
       </View>
+
+      {/* Review Modal */}
+      {property && auth.currentUser && (
+        <ReviewModal
+          visible={showReviewModal}
+          onClose={() => setShowReviewModal(false)}
+          propertyId={property.id}
+          propertyTitle={property.title || 'Property'}
+          userId={auth.currentUser.uid}
+          userName={auth.currentUser.displayName || auth.currentUser.email || 'User'}
+          userEmail={auth.currentUser.email || ''}
+          onReviewAdded={handleReviewAdded}
+        />
+      )}
     </ScrollView>
   );
 }
@@ -1085,5 +1432,30 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginRight: 4,
+  },
+  addReviewButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginBottom: 16,
+    gap: 8,
+  },
+  addReviewButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  noReviewsContainer: {
+    alignItems: 'center',
+    paddingVertical: 32,
+    gap: 12,
+  },
+  noReviewsText: {
+    fontSize: 16,
+    textAlign: 'center',
+    lineHeight: 22,
   },
 });

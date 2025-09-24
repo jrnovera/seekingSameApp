@@ -1,13 +1,13 @@
-import { db } from '@/config/firebase';
+import conversationService from '@/services/conversationService';
 import { Colors } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { getAuth } from 'firebase/auth';
-import { addDoc, collection, doc, getDoc, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   KeyboardAvoidingView,
   Platform,
   SafeAreaView,
@@ -18,120 +18,56 @@ import {
   useColorScheme,
   View,
 } from 'react-native';
+import type { Message, Conversation } from '@/services/conversationService';
 
-// Simple message type
-type Message = {
-  id: string;
-  text: string;
-  sent: boolean;
-  timestamp: Date;
-};
+// Using Message type from conversationService
 
 export default function ConversationScreen() {
   const { id } = useLocalSearchParams();
   const [messages, setMessages] = useState<Message[]>([]);
+  const [conversation, setConversation] = useState<Conversation | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
   const scheme = useColorScheme() ?? 'light';
   const C = Colors[scheme as 'light' | 'dark'];
   const auth = getAuth();
 
-  // Load messages with proper error handling and ensure chat exists
+  // Load conversation and messages
   useEffect(() => {
     if (!id || !auth.currentUser) {
       setLoading(false);
       return;
     }
 
-    console.log('Loading messages for chat:', id);
+    console.log('Loading conversation:', id);
 
-    const initializeChat = async () => {
+    const loadConversation = async () => {
       try {
-        // Check if chat document exists
-        const chatRef = doc(db, 'chat', id as string);
-        const chatDoc = await getDoc(chatRef);
-
-        if (!chatDoc.exists()) {
-          console.log('Chat document does not exist when loading conversation');
-          // We could create it here, but it's better to create it when sending the first message
-          // This way we have the proper context from the property details page
-        }
-
-        // Query messages for this specific chat
-        const messagesQuery = query(
-          collection(db, 'message'),
-          where('chatRef', '==', id),
-          orderBy('messageTime', 'asc')
-        );
-
-        const unsubscribe = onSnapshot(
-          messagesQuery, 
-          (snapshot) => {
-            console.log('Messages snapshot received, count:', snapshot.docs.length);
-            const messagesList: Message[] = [];
-            
-            snapshot.forEach((docSnapshot) => {
-              try {
-                const data = docSnapshot.data();
-                
-                if (!data) {
-                  console.warn('Empty message data for doc:', docSnapshot.id);
-                  return;
-                }
-
-                const currentUserId = auth.currentUser?.uid;
-                
-                // Safe timestamp handling
-                let messageTime = new Date();
-                try {
-                  if (data.messageTime && typeof data.messageTime === 'object' && data.messageTime.toDate) {
-                    messageTime = data.messageTime.toDate();
-                  } else if (data.messageTime) {
-                    messageTime = new Date(data.messageTime);
-                  }
-                } catch (timeError) {
-                  console.warn('Error parsing timestamp for message:', docSnapshot.id, timeError);
-                }
-                
-                messagesList.push({
-                  id: docSnapshot.id,
-                  text: data.message || '',
-                  sent: data.messageOwner === currentUserId,
-                  timestamp: messageTime
-                });
-              } catch (docError) {
-                console.error('Error processing message document:', docSnapshot.id, docError);
-              }
-            });
-            
-            setMessages(messagesList);
-            setLoading(false);
-          },
-          (error) => {
-            console.error('Error listening to messages:', error);
-            setLoading(false);
-          }
-        );
-
-        return unsubscribe;
+        const conv = await conversationService.getConversation(id as string);
+        setConversation(conv);
       } catch (error) {
-        console.error('Error initializing chat:', error);
-        setLoading(false);
-        return null;
+        console.error('Error loading conversation:', error);
+        setError('Conversation not found or no longer exists');
+        setLoading(false); // Make sure to stop loading even on error
       }
     };
 
-    let unsubscribe: (() => void) | null = null;
-    
-    initializeChat().then((unsub) => {
-      unsubscribe = unsub;
-    });
+    loadConversation();
+
+    // Subscribe to messages
+    const unsubscribe = conversationService.subscribeToMessages(
+      id as string,
+      (messagesList: Message[]) => {
+        console.log('Messages received:', messagesList.length);
+        setMessages(messagesList);
+        setLoading(false);
+      }
+    );
 
     return () => {
-      if (unsubscribe) {
-        unsubscribe();
-      }
+      unsubscribe();
     };
   }, [id, auth.currentUser]);
 
@@ -157,48 +93,8 @@ export default function ConversationScreen() {
       // Clear input immediately for better UX
       setNewMessage('');
 
-      // First, ensure the chat document exists
-      const chatRef = doc(db, 'chat', id as string);
-      const chatDoc = await getDoc(chatRef);
-
-      if (!chatDoc.exists()) {
-        console.log('Chat document does not exist, creating it...');
-        
-        // Create the chat document following the exact schema
-        await setDoc(chatRef, {
-          userAuth: auth.currentUser.uid,        // Doc Reference (users)
-          otherUser: 'unknown',                  // Doc Reference (users) - should be passed from navigation
-          lastMessage: messageText,              // String
-          messageTime: serverTimestamp(),        // DateTime
-          user: auth.currentUser.uid,            // Doc Reference (users)
-          propertyCreatedBy: 'unknown'           // Doc Reference (users) - should be passed from property
-        });
-        
-        console.log('Chat document created successfully');
-      }
-
-      // Now add the message to Firestore following the exact schema
-      const messageDoc = await addDoc(collection(db, 'message'), {
-        messageOwner: auth.currentUser.uid,    // Doc Reference (users)
-        chatRef: id,                           // Doc Reference (chat)
-        message: messageText,                  // String
-        imagePath: null,                       // Image Path (optional)
-        messageTime: serverTimestamp()         // DateTime
-      });
-
-      console.log('Message sent successfully:', messageDoc.id);
-
-      // Update chat with last message
-      try {
-        await updateDoc(chatRef, {
-          lastMessage: messageText,
-          messageTime: serverTimestamp()
-        });
-        console.log('Chat document updated successfully');
-      } catch (chatUpdateError) {
-        console.warn('Failed to update chat document:', chatUpdateError);
-        // Don't fail the whole operation if chat update fails
-      }
+      await conversationService.sendMessage(id as string, auth.currentUser.uid, messageText);
+      console.log('Message sent successfully');
 
     } catch (error) {
       console.error('Error sending message:', error);
@@ -216,33 +112,40 @@ export default function ConversationScreen() {
     });
   };
 
-  const renderMessage = ({ item }: { item: Message }) => (
-    <View style={[
-      styles.messageContainer,
-      item.sent ? styles.sentMessage : styles.receivedMessage
-    ]}>
+  const renderMessage = ({ item }: { item: Message }) => {
+    const isOwn = item.senderId === auth.currentUser?.uid;
+    return (
       <View style={[
-        styles.messageBubble,
-        {
-          backgroundColor: item.sent ? C.tint : C.surface,
-          borderColor: C.surfaceBorder
-        }
+        styles.messageContainer,
+        isOwn ? styles.sentMessage : styles.receivedMessage
       ]}>
-        <Text style={[
-          styles.messageText,
-          { color: item.sent ? '#fff' : C.text }
+        <View style={[
+          styles.messageBubble,
+          {
+            backgroundColor: isOwn ? C.tint : C.surface,
+            borderColor: C.surfaceBorder
+          }
         ]}>
-          {item.text}
-        </Text>
-        <Text style={[
-          styles.messageTime,
-          { color: item.sent ? 'rgba(255,255,255,0.7)' : C.textMuted }
-        ]}>
-          {formatTime(item.timestamp)}
-        </Text>
+          {item.imagePath ? (
+            <Image source={{ uri: item.imagePath }} style={styles.messageImage} />
+          ) : (
+            <Text style={[
+              styles.messageText,
+              { color: isOwn ? '#fff' : C.text }
+            ]}>
+              {item.text}
+            </Text>
+          )}
+          <Text style={[
+            styles.messageTime,
+            { color: isOwn ? 'rgba(255,255,255,0.7)' : C.textMuted }
+          ]}>
+            {formatTime(item.timestamp)}
+          </Text>
+        </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   if (loading) {
     return (
@@ -250,6 +153,38 @@ export default function ConversationScreen() {
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={C.tint} />
           <Text style={[styles.loadingText, { color: C.text }]}>Loading...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: C.screenBg }]}>
+        {/* Simple Header */}
+        <View style={[styles.header, { backgroundColor: C.surface, borderBottomColor: C.surfaceBorder }]}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <Ionicons name="arrow-back" size={24} color={C.text} />
+          </TouchableOpacity>
+          <Text style={[styles.headerTitle, { color: C.text }]}>Chat</Text>
+          <View style={{ width: 40 }} />
+        </View>
+
+        <View style={styles.errorContainer}>
+          <Ionicons name="chatbubble-outline" size={64} color={C.textMuted} />
+          <Text style={[styles.errorTitle, { color: C.text }]}>Conversation Not Found</Text>
+          <Text style={[styles.errorMessage, { color: C.textMuted }]}>
+            This conversation no longer exists or you don't have access to it.
+          </Text>
+          <TouchableOpacity
+            style={[styles.backToChatsButton, { backgroundColor: C.tint }]}
+            onPress={() => router.replace('/(tabs)/chat')}
+          >
+            <Text style={styles.backToChatsButtonText}>Back to Conversations</Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
@@ -265,7 +200,16 @@ export default function ConversationScreen() {
         >
           <Ionicons name="arrow-back" size={24} color={C.text} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: C.text }]}>Chat</Text>
+        <View style={{ flex: 1, alignItems: 'center' }}>
+          <Text style={[styles.headerTitle, { color: C.text }]}>
+            {conversation ? conversationService.getOtherParticipant(conversation, auth.currentUser?.uid || '')?.displayName || 'Chat' : 'Chat'}
+          </Text>
+          {conversation && (
+            <Text style={[styles.propertySubtitle, { color: C.textMuted }]}>
+              {conversation.propertyTitle}
+            </Text>
+          )}
+        </View>
         <View style={{ width: 40 }} />
       </View>
 
@@ -339,16 +283,50 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   headerTitle: {
-    flex: 1,
     textAlign: 'center',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  propertySubtitle: {
+    textAlign: 'center',
+    fontSize: 12,
+    fontStyle: 'italic',
+    marginTop: 2,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginTop: 16,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  errorMessage: {
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 24,
+  },
+  backToChatsButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 20,
+  },
+  backToChatsButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
   emptyText: {
     marginTop: 12,
@@ -403,6 +381,11 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     marginRight: 8,
     maxHeight: 100,
+  },
+  messageImage: {
+    maxWidth: 200,
+    maxHeight: 200,
+    borderRadius: 12,
   },
   sendButton: {
     width: 36,

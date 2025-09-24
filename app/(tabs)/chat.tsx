@@ -1,8 +1,8 @@
-import { auth, db } from '@/config/firebase';
+import conversationService from '@/services/conversationService';
 import { Colors } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { collection, onSnapshot, orderBy, query, doc, getDoc } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -14,36 +14,39 @@ import {
   useColorScheme,
   View,
 } from 'react-native';
+import type { Conversation } from '@/services/conversationService';
 
-// Simple chat item type for display
-type ChatItem = {
+// Display conversation type for list
+type ConversationDisplay = {
   id: string;
-  otherUserId: string;
-  otherUserName: string;
+  otherUser: {
+    uid: string;
+    displayName?: string;
+    email?: string;
+    role: 'host' | 'user';
+  } | null;
+  propertyTitle: string;
   lastMessage: string;
-  time: string;
-  unread: number;
+  messageTime: Date;
+  isFromCurrentUser: boolean;
 };
 
 export default function Chat() {
-  const [chats, setChats] = useState<ChatItem[]>([]);
+  const [conversations, setConversations] = useState<ConversationDisplay[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const scheme = useColorScheme() ?? 'light';
   const C = Colors[scheme as 'light' | 'dark'];
-  // Use initialized auth from our Firebase config
-  // This avoids pulling in the RN-specific entrypoint multiple times
+  const auth = getAuth();
   
   // Simple format timestamp function
-  const formatTime = (timestamp: any) => {
-    if (!timestamp) return '';
-    
+  const formatTime = (date: Date) => {
+    if (!date) return '';
+
     try {
-      // Handle Firebase timestamp
-      const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
       const now = new Date();
       const diffInDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
-      
+
       if (diffInDays === 0) {
         // Today: show time
         return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
@@ -68,83 +71,44 @@ export default function Chat() {
       setLoading(false);
       return;
     }
-    
+
     const userId = auth.currentUser.uid;
-    console.log('Fetching chats for user:', userId);
-    
-    // Single query to get all chats and filter by authenticated user
-    const chatsQuery = query(
-      collection(db, 'chat'),
-      orderBy('messageTime', 'desc')
-    );
-    
-    const unsubscribe = onSnapshot(chatsQuery, async (snapshot) => {
-      console.log('Chat snapshot received, total docs:', snapshot.docs.length);
-      const chatItems: ChatItem[] = [];
-      
-      for (const chatDoc of snapshot.docs) {
-        try {
-          const data = chatDoc.data();
-          
-          if (!data) {
-            console.warn('Empty chat data for doc:', chatDoc.id);
-            continue;
-          }
-          
-          // Only include chats where current user is involved (either userAuth or otherUser)
-          if (data.userAuth === userId || data.otherUser === userId) {
-            // Determine the other user
-            const otherUserId = data.userAuth === userId ? data.otherUser : data.userAuth;
-            
-            // Fetch other user's name
-            let otherUserName = 'Unknown User';
-            try {
-              if (otherUserId && otherUserId !== 'unknown') {
-                const userDoc = await getDoc(doc(db, 'users', otherUserId));
-                if (userDoc.exists()) {
-                  const userData = userDoc.data();
-                  otherUserName = userData.displayName || userData.name || userData.email || 'Unknown User';
-                }
-              }
-            } catch (userError) {
-              console.warn('Error fetching user data for:', otherUserId, userError);
-            }
-            
-            chatItems.push({
-              id: chatDoc.id,
-              otherUserId: otherUserId || 'unknown',
-              otherUserName: otherUserName,
-              lastMessage: data.lastMessage || 'No messages yet',
-              time: formatTime(data.messageTime),
-              unread: 0
-            });
-          }
-        } catch (error) {
-          console.error('Error processing chat doc:', chatDoc.id, error);
-        }
+    console.log('Fetching conversations for user:', userId);
+
+    const unsubscribe = conversationService.subscribeToUserConversations(
+      userId,
+      (rawConversations: Conversation[]) => {
+        console.log('Conversations received:', rawConversations.length);
+
+        const formattedConversations: ConversationDisplay[] = rawConversations.map(conversation => {
+          return conversationService.formatConversationForDisplay(conversation, userId);
+        });
+
+        setConversations(formattedConversations);
+        setLoading(false);
       }
-      
-      console.log('Processed chat items for user:', chatItems.length);
-      setChats(chatItems);
-      setLoading(false);
-    }, (error) => {
-      console.error('Error fetching chats:', error);
-      setChats([]);
-      setLoading(false);
-    });
-    
+    );
+
     return () => {
       unsubscribe();
     };
   }, [auth.currentUser]);
   
-  // Filter chats based on search query - search in user names and messages
-  const filteredChats = searchQuery
-    ? chats.filter(chat => 
-        chat.otherUserName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        chat.lastMessage.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : chats;
+  // Filter conversations based on search query
+  const filteredConversations = searchQuery
+    ? conversations.filter(conversation => {
+        const query = searchQuery.toLowerCase();
+        const displayName = conversation.otherUser?.displayName?.toLowerCase() || '';
+        const email = conversation.otherUser?.email?.toLowerCase() || '';
+        const lastMessage = conversation.lastMessage.toLowerCase();
+        const propertyTitle = conversation.propertyTitle.toLowerCase();
+
+        return displayName.includes(query) ||
+               email.includes(query) ||
+               lastMessage.includes(query) ||
+               propertyTitle.includes(query);
+      })
+    : conversations;
 
   return (
     <View style={[styles.screen, { backgroundColor: C.screenBg }]}> 
@@ -182,17 +146,17 @@ export default function Chat() {
           <Text style={[styles.emptyStateTitle, { color: C.text }]}>Sign in to view chats</Text>
           <Text style={[styles.emptyStateMessage, { color: C.textMuted }]}>Please sign in to start chatting with property owners</Text>
         </View>
-      ) : chats.length === 0 ? (
+      ) : conversations.length === 0 ? (
         <View style={styles.emptyStateContainer}>
           <Ionicons name="chatbubbles-outline" size={64} color={C.textMuted} />
           <Text style={[styles.emptyStateTitle, { color: C.text }]}>No conversations yet</Text>
           <Text style={[styles.emptyStateMessage, { color: C.textMuted }]}>Start chatting with property owners by viewing properties and clicking Chat</Text>
         </View>
       ) : (
-        /* Chat list */
+        /* Conversation list */
         <FlatList
-          data={filteredChats || []}
-          keyExtractor={(item) => item?.id || `chat-${Date.now()}-${Math.random()}`}
+          data={filteredConversations || []}
+          keyExtractor={(item) => item?.id || `conversation-${Date.now()}-${Math.random()}`}
           contentContainerStyle={{ paddingBottom: 24 }}
           removeClippedSubviews={false}
           initialNumToRender={10}
@@ -201,30 +165,30 @@ export default function Chat() {
           renderItem={({ item }) => {
             if (!item) return null;
             return (
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.row, { borderBottomColor: C.surfaceBorder }]}
                 activeOpacity={0.7}
                 onPress={() => router.push({ pathname: '/conversation/[id]', params: { id: item.id } })}
-              > 
+              >
                 <View style={styles.avatarWrap}>
                   <View style={[styles.avatarPlaceholder, { backgroundColor: C.surfaceBorder }]}>
                     <Text style={[styles.avatarInitial, { color: C.text }]}>
-                      {item.otherUserName.substring(0, 1).toUpperCase()}
+                      {(item.otherUser?.displayName || item.otherUser?.email || '?').substring(0, 1).toUpperCase()}
                     </Text>
                   </View>
                 </View>
                 <View style={styles.content}>
                   <View style={styles.nameRow}>
-                    <Text style={[styles.name, { color: C.text }]}>{item.otherUserName}</Text>
-                    <Text style={[styles.time, { color: C.textMuted }]}>{item.time}</Text>
+                    <Text style={[styles.name, { color: C.text }]}>{item.otherUser?.displayName || item.otherUser?.email || 'Unknown User'}</Text>
+                    <Text style={[styles.time, { color: C.textMuted }]}>{formatTime(item.messageTime)}</Text>
                   </View>
+                  <Text numberOfLines={1} style={[styles.propertyTitle, { color: C.textMuted }]}>
+                    🏠 {item.propertyTitle}
+                  </Text>
                   <View style={styles.msgRow}>
-                    <Text numberOfLines={1} style={[styles.msg, { color: C.textMuted }]}>{item.lastMessage}</Text>
-                    {item.unread > 0 ? (
-                      <View style={[styles.badge, { backgroundColor: C.tint }]}> 
-                        <Text style={styles.badgeText}>{item.unread}</Text>
-                      </View>
-                    ) : null}
+                    <Text numberOfLines={1} style={[styles.msg, { color: C.textMuted }]}>
+                      {item.isFromCurrentUser ? 'You: ' : ''}{item.lastMessage || 'No messages yet'}
+                    </Text>
                   </View>
                 </View>
               </TouchableOpacity>
@@ -330,6 +294,11 @@ const styles = StyleSheet.create({
   },
   time: {
     fontSize: 12,
+  },
+  propertyTitle: {
+    fontSize: 12,
+    marginTop: 2,
+    fontStyle: 'italic',
   },
   msgRow: {
     marginTop: 4,

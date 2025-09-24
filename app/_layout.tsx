@@ -50,6 +50,9 @@ export default function RootLayout() {
             <Stack.Screen name="property/[id]" options={{ headerShown: false }} />
             <Stack.Screen name="property/reviews" options={{ headerShown: false }} />
             <Stack.Screen name="profile" options={{ headerShown: false }} />
+            <Stack.Screen name="payment-processing" options={{ headerShown: false }} />
+            <Stack.Screen name="payment-success" options={{ headerShown: false }} />
+            <Stack.Screen name="payment-failed" options={{ headerShown: false }} />
           </Stack>
           <StatusBar style="auto" />
         </ThemeProvider>
