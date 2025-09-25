@@ -1,7 +1,8 @@
 import { AntDesign, Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Image, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, ImageBackground, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 
 export default function SignUpScreen() {
@@ -76,29 +77,35 @@ export default function SignUpScreen() {
   };
 
   return (
-    <ScrollView contentContainerStyle={[styles.scroll, isDark && styles.scrollDark]} keyboardShouldPersistTaps="handled">
-        {/* Logo Image with enhanced presentation and animation */}
-        <View style={styles.logoContainer}>
-          <Animated.View 
-            style={[
-              styles.logoWrapper,
-              { 
-                opacity: fadeAnim,
-                transform: [{ scale: scaleAnim }]
-              }
-            ]}
-          >
-            <Image 
-              source={require('../../assets/images/Logo2.jpg')} 
-              style={styles.logoImage}
-              resizeMode="cover"
-              
-            />
-          </Animated.View>
-        </View>
-        
-        <Text style={[styles.title, isDark && styles.titleDark]}>Get Started</Text>
-        <Text style={styles.subtitle}>Let's get started by filling out the form below.</Text>
+    <View style={{ flex: 1 }}>
+      {/* Background image with gradient overlay */}
+      <ImageBackground 
+        source={require('../../assets/images/newloginlogo.png')} 
+        style={styles.bgImage}
+        imageStyle={styles.bgImageStyle}
+      >
+        <LinearGradient 
+          colors={["rgba(106,13,173,0.6)", "rgba(60,149,166,0.6)"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.bgOverlay}
+        />
+      </ImageBackground>
+
+      <ScrollView contentContainerStyle={[styles.scroll, isDark && styles.scrollDark]} keyboardShouldPersistTaps="handled">
+        <View style={styles.topSpacer} />
+
+        <Animated.View 
+          style={[
+            styles.contentCard,
+            { 
+              opacity: fadeAnim,
+              transform: [{ scale: scaleAnim }]
+            }
+          ]}
+        >
+          <Text style={styles.heading}>Create your account</Text>
+       
 
         {/* Display Name */}
         <View style={[styles.inputWrapper, formData.displayName ? styles.focusedWrapper : null]}> 
@@ -117,7 +124,7 @@ export default function SignUpScreen() {
         <View style={styles.inputWrapper}>
           <TextInput
             placeholder="Email"
-            placeholderTextColor={isDark ? '#9aa3b2' : '#9ca3af'}
+            placeholderTextColor="#9ca3af"
             keyboardType="email-address"
             autoCapitalize="none"
             style={styles.input}
@@ -131,7 +138,7 @@ export default function SignUpScreen() {
         <View style={styles.inputWrapper}>
           <TextInput
             placeholder="Password"
-            placeholderTextColor={isDark ? '#9aa3b2' : '#9ca3af'}
+            placeholderTextColor="#9ca3af"
             secureTextEntry={!showPassword}
             style={[styles.input, { paddingRight: 44 }]}
             value={formData.password}
@@ -145,8 +152,8 @@ export default function SignUpScreen() {
           >
             <Ionicons 
               name={showPassword ? "eye-outline" : "eye-off-outline"} 
-              size={22} 
-              color="#8a8ea3" 
+              size={20} 
+              color="#9ca3af" 
             />
           </TouchableOpacity>
         </View>
@@ -154,7 +161,7 @@ export default function SignUpScreen() {
         {/* Create Account Button */}
         <TouchableOpacity 
           style={[styles.primaryButton, loading && styles.primaryButtonDisabled]} 
-          activeOpacity={0.8}
+          activeOpacity={0.85}
           onPress={handleSignUp}
           disabled={loading}
         >
@@ -165,47 +172,89 @@ export default function SignUpScreen() {
           )}
         </TouchableOpacity>
 
-        {/* Divider */}
-        <Text style={styles.dividerText}>Or sign up with</Text>
+        {/* OR Divider */}
+        <View style={styles.hrRow}>
+          <View style={styles.hr} />
+          <Text style={styles.orText}>OR</Text>
+          <View style={styles.hr} />
+        </View>
 
-        {/* Social Buttons */}
-        <View style={styles.socialStack}>
-          <TouchableOpacity style={styles.socialButton} activeOpacity={0.85}>
-            <AntDesign name="google" size={18} color="#0f172a" style={{ marginRight: 8 }} />
-            <Text style={styles.socialText}>Continue with Google</Text>
+        {/* Social Row */}
+        <View style={styles.socialRow}>
+          <TouchableOpacity style={styles.socialIcon} activeOpacity={0.9}>
+            <AntDesign name="google" size={20} color="#db4437" />
           </TouchableOpacity>
-          {Platform.OS !== 'web' && (
-            <TouchableOpacity style={styles.socialButton} activeOpacity={0.85}>
-              <AntDesign name="apple" size={18} color="#0f172a" style={{ marginRight: 8 }} />
-              <Text style={styles.socialText}>Continue with Apple</Text>
-            </TouchableOpacity>
-          )}
-          
-          <TouchableOpacity onPress={() => router.push('/sign-in')}>
-            <Text style={styles.metaText}>Already have an account? <Text style={styles.linkHighlight}>Login</Text></Text>
+          <TouchableOpacity style={styles.socialIcon} activeOpacity={0.9}>
+            <AntDesign name="apple" size={20} color="#000" />
           </TouchableOpacity>
         </View>
-    </ScrollView>
+
+        <TouchableOpacity onPress={() => router.push('/sign-in')} style={{ marginTop: 16 }}>
+          <Text style={styles.metaText}>Already have an account? <Text style={styles.linkHighlight}>Login</Text></Text>
+        </TouchableOpacity>
+        </Animated.View>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  // Background image + overlay
+  bgImage: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  bgImageStyle: {
+    resizeMode: 'cover',
+    opacity: 0.6,
+  },
+  bgOverlay: {
+    ...StyleSheet.absoluteFillObject,
+  },
   scroll: {
     flexGrow: 1,
     padding: 20,
-    backgroundColor: '#f6f7fb',
+    backgroundColor: 'transparent',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   scrollDark: {
-    backgroundColor: '#0b0f1a',
+    backgroundColor: 'transparent',
+  },
+  topSpacer: {
+    height: 80,
+  },
+  contentCard: {
+    width: '100%',
+    maxWidth: 400,
+    backgroundColor: 'rgba(255, 255, 255, 0.88)',
+    borderRadius: 24,
+    padding: 32,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  heading: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#1f2937',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  subheading: {
+    fontSize: 14,
+    color: '#6b7280',
+    textAlign: 'center',
+    marginBottom: 32,
   },
   metaText: {
     color: '#6b7280',
-    fontSize: 12,
+    fontSize: 16,
     marginTop: 2,
   },
   linkHighlight: {
-    color: '#a855f7',
+    color: 'purple',
     fontWeight: '600',
   },
   bottomTextBlock: {
@@ -262,73 +311,82 @@ const styles = StyleSheet.create({
   },
   inputWrapper: {
     position: 'relative',
-    backgroundColor: '#f1f5f9',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: Platform.select({ ios: 14, android: 8, default: 12 }),
-    marginBottom: 12,
+    backgroundColor: '#f8fafc',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#eef0f6',
+    borderColor: '#e2e8f0',
     width: '100%',
-    maxWidth: 400,
+    minHeight: 52,
   },
   input: {
     fontSize: 16,
-    color: '#0f172a',
-    paddingVertical: 6,
+    color: '#1f2937',
+    paddingVertical: 0,
   },
   iconButton: {
     position: 'absolute',
-    right: 12,
-    top: '50%',
-    marginTop: -12,
-    height: 24,
-    width: 24,
+    right: 16,
+    top: 0,
+    bottom: 0,
+    width: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },
   primaryButton: {
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: '#a855f7',
+    height: 52,
+    borderRadius: 16,
+    backgroundColor: '#cb54f8',
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 8,
-    marginBottom: 16,
-    shadowColor: '#a855f7',
-    shadowOpacity: 0.45,
-    shadowOffset: { width: 0, height: 8 },
+    marginBottom: 24,
+    shadowColor: '#6a0dad',
+    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 4 },
     shadowRadius: 12,
     elevation: 4,
-    paddingHorizontal: 18,
   },
   primaryButtonText: {
     color: 'white',
-    fontWeight: '700',
+    fontWeight: '600',
     fontSize: 16,
   },
   primaryButtonDisabled: {
     opacity: 0.7,
   },
-  dividerText: {
-    textAlign: 'center',
-    color: '#6b7280',
-    marginVertical: 4,
-  },
-  socialStack: {
-    gap: 10,
-  },
-  socialButton: {
+  hrRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#eef2f7',
-    borderRadius: 12,
-    height: 46,
+    marginBottom: 24,
+    gap: 16,
   },
-  socialText: {
-    color: '#0f172a',
-    fontWeight: '600',
+  hr: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#e2e8f0',
+  },
+  orText: {
+    fontSize: 14,
+    color: '#9ca3af',
+    fontWeight: '500',
+  },
+  socialRow: {
+    flexDirection: 'row',
+    gap: 16,
+    justifyContent: 'center',
+  },
+  socialIcon: {
+    height: 48,
+    width: 48,
+    borderRadius: 12,
+    backgroundColor: '#f8fafc',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
   },
   // Focus styles to mimic the purple border in the mock
   focusedWrapper: {

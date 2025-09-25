@@ -908,7 +908,9 @@ export default function Homepage() {
       <View style={styles.sectionHeader}>
         <Text style={[styles.sectionTitle, { color: C.text }]}>{isSearchActive() ? 'Search Results' : 'Listings'}</Text>
         {!isSearchActive() && (
-          <TouchableOpacity activeOpacity={0.7}><Text style={[styles.viewAll, { color: C.tint }]}>View all</Text></TouchableOpacity>
+          <TouchableOpacity activeOpacity={0.7} onPress={() => router.push('/viewlisting')}>
+            <Text style={[styles.viewAll, { color: C.tint }]}>View all</Text>
+          </TouchableOpacity>
         )}
       </View>
       

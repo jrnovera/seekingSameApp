@@ -1,9 +1,9 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User as FirebaseUser, onAuthStateChanged } from 'firebase/auth';
+import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import { auth } from '../config/firebase';
 import { AuthService } from '../services/authService';
-import { User, CreateUserData, LoginData } from '../types/user';
-import { getStoredAuthUser, clearStoredAuthUser } from '../utils/setupFirebaseAuth';
+import { CreateUserData, LoginData, User } from '../types/user';
+import { clearStoredAuthUser, getStoredAuthUser } from '../utils/setupFirebaseAuth';
 
 interface AuthContextType {
   user: FirebaseUser | null;

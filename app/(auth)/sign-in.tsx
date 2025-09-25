@@ -1,7 +1,8 @@
 import { AntDesign, Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, ImageBackground, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 
 export default function SignInScreen() {
@@ -63,265 +64,281 @@ export default function SignInScreen() {
   };
 
   return (
-    <ScrollView contentContainerStyle={[styles.scroll, isDark && styles.scrollDark]} keyboardShouldPersistTaps="handled">
-        {/* Logo Image with enhanced presentation and animation */}
-        <View style={styles.headerContainer}>
-          <Animated.View 
-            style={[
-              styles.logoWrapper,
-              { 
-                opacity: fadeAnim,
-                transform: [{ scale: scaleAnim }]
-              }
-            ]}
-          >
-            <Image 
-              source={require('../../assets/images/Compass.jpg')} 
-              style={styles.logoImage}
-              resizeMode="cover"
-            />
-          </Animated.View>
-        </View>
+    <View style={{ flex: 1 }}>
+      {/* Background image with gradient overlay */}
+      <ImageBackground 
+        source={require('../../assets/images/newloginlogo.png')} 
+        style={styles.bgImage}
+        imageStyle={styles.bgImageStyle}
+      >
+        <LinearGradient 
+          colors={["#cb54f8", "#6095a6"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.bgOverlay}
+        />
+      </ImageBackground>
 
-        <Text style={[styles.heading, isDark && styles.headingDark]}>Let's <Text style={styles.accent}>Sign In</Text></Text>
+      <ScrollView contentContainerStyle={[styles.scroll, isDark && styles.scrollDark]} keyboardShouldPersistTaps="handled">
+        {/* Spacer for top padding */}
+        <View style={styles.topSpacer} />
 
-        {/* Email */}
-        <View style={styles.inputWrapper}>
-          <TextInput
-            placeholder="Email"
-            placeholderTextColor={isDark ? '#9aa3b2' : '#9ca3af'}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            style={styles.input}
-            value={formData.email}
-            onChangeText={(text) => setFormData(prev => ({ ...prev, email: text }))}
-            editable={!loading}
-          />
-        </View>
-
-        {/* Password */}
-        <View style={styles.inputWrapper}>
-          <TextInput
-            placeholder="Password"
-            placeholderTextColor={isDark ? '#9aa3b2' : '#9ca3af'}
-            secureTextEntry={!showPassword}
-            style={[styles.input, { paddingRight: 44 }]}
-            value={formData.password}
-            onChangeText={(text) => setFormData(prev => ({ ...prev, password: text }))}
-            editable={!loading}
-          />
-          <TouchableOpacity 
-            style={styles.iconButton} 
-            activeOpacity={0.7}
-            onPress={() => setShowPassword(!showPassword)}
-          >
-            <Ionicons 
-              name={showPassword ? "eye-outline" : "eye-off-outline"} 
-              size={22} 
-              color="#8a8ea3" 
-            />
-          </TouchableOpacity>
-        </View>
-
-        {/* Inline links */}
-        <View style={styles.inlineLinks}>
-          <TouchableOpacity activeOpacity={0.8}><Text style={styles.linkText}>Forgot password?</Text></TouchableOpacity>
-          <TouchableOpacity activeOpacity={0.8}><Text style={styles.linkText}>Show password</Text></TouchableOpacity>
-        </View>
-
-        {/* Login Button */}
-        <TouchableOpacity 
-          style={[styles.primaryButton, loading && styles.primaryButtonDisabled]} 
-          activeOpacity={0.85}
-          onPress={handleSignIn}
-          disabled={loading}
+        {/* Main content card */}
+        <Animated.View 
+          style={[
+            styles.contentCard,
+            { 
+              opacity: fadeAnim,
+              transform: [{ scale: scaleAnim }]
+            }
+          ]}
         >
-          {loading ? (
-            <ActivityIndicator color="white" size="small" />
-          ) : (
-            <Text style={styles.primaryButtonText}>Login</Text>
-          )}
-        </TouchableOpacity>
+          <Text style={styles.heading}>Welcome Back</Text>
+          <Text style={styles.subheading}>Sign in to continue</Text>
 
-        {/* OR Divider */}
-        <View style={styles.hrRow}>
-          <View style={styles.hr} />
-          <Text style={styles.orText}>OR</Text>
-          <View style={styles.hr} />
-        </View>
+          {/* Email */}
+          <View style={styles.inputWrapper}>
+            <TextInput
+              placeholder="Email"
+              placeholderTextColor="#9ca3af"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              style={styles.input}
+              value={formData.email}
+              onChangeText={(text) => setFormData(prev => ({ ...prev, email: text }))}
+              editable={!loading}
+            />
+          </View>
 
-        {/* Social Row */}
-        <View style={styles.socialRow}>
-          <TouchableOpacity style={[styles.socialPill]} activeOpacity={0.9}>
-            <AntDesign name="google" size={20} color="#db4437" />
+          {/* Password */}
+          <View style={styles.inputWrapper}>
+            <TextInput
+              placeholder="Password"
+              placeholderTextColor="#9ca3af"
+              secureTextEntry={!showPassword}
+              style={[styles.input, { paddingRight: 44 }]}
+              value={formData.password}
+              onChangeText={(text) => setFormData(prev => ({ ...prev, password: text }))}
+              editable={!loading}
+            />
+            <TouchableOpacity 
+              style={styles.iconButton} 
+              activeOpacity={0.7}
+              onPress={() => setShowPassword(!showPassword)}
+            >
+              <Ionicons 
+                name={showPassword ? "eye-outline" : "eye-off-outline"} 
+                size={20} 
+                color="#9ca3af" 
+              />
+            </TouchableOpacity>
+          </View>
+
+          {/* Forgot password link */}
+          <TouchableOpacity 
+            style={styles.forgotLink} 
+            activeOpacity={0.8}
+            onPress={() => router.push('/forgot-password')}
+          >
+            <Text style={styles.linkText}>Forgot password?</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.socialPill]} activeOpacity={0.9}>
-            <AntDesign name="apple" size={20} color="#1877f2" />
+
+          {/* Login Button */}
+          <TouchableOpacity 
+            style={[styles.primaryButton, loading && styles.primaryButtonDisabled]} 
+            activeOpacity={0.85}
+            onPress={handleSignIn}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="white" size="small" />
+            ) : (
+              <Text style={styles.primaryButtonText}>Sign In</Text>
+            )}
           </TouchableOpacity>
-        </View>
+
+          {/* OR Divider */}
+          <View style={styles.hrRow}>
+            <View style={styles.hr} />
+            <Text style={styles.orText}>OR</Text>
+            <View style={styles.hr} />
+          </View>
+
+          {/* Social Row */}
+          <View style={styles.socialRow}>
+            <TouchableOpacity style={styles.socialButton} activeOpacity={0.9}>
+              <AntDesign name="google" size={20} color="#db4437" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.socialButton} activeOpacity={0.9}>
+              <AntDesign name="apple" size={20} color="#000" />
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
 
         {/* Bottom links */}
         <View style={styles.bottomTextBlock}>
           <TouchableOpacity onPress={() => router.push('/sign-up')}>
-            <Text style={styles.metaText}>Don't have an account? <Text style={styles.linkHighlight}>Register</Text></Text>
+            <Text style={styles.metaText}>Don't have an account? <Text style={styles.linkHighlight}>Sign Up</Text></Text>
           </TouchableOpacity>
-         
         </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  // Background image + overlay
+  bgImage: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  bgImageStyle: {
+    resizeMode: 'cover',
+    opacity: 0.6,
+  },
+  bgOverlay: {
+    ...StyleSheet.absoluteFillObject,
+  },
   scroll: {
     flexGrow: 1,
     padding: 20,
-    backgroundColor: '#f6f7fb',
-    alignItems: 'center',
-  },
-  scrollDark: {
-    backgroundColor: '#0b0f1a',
-  },
-  headerContainer: {
-    height: 180,
-    width: '100%',
+    backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 20,
-    paddingVertical: 5,
   },
-  logoWrapper: {
-    height: 140,
-    width: '85%',
-    maxWidth: 400,
-    borderRadius: 12,
-    overflow: 'hidden',
-    backgroundColor: '#ffffff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-    padding: 10,
+  scrollDark: {
+    backgroundColor: 'transparent',
   },
-  logoImage: {
-    height: '100%',
+  topSpacer: {
+    height: 80,
+  },
+  contentCard: {
     width: '100%',
+    maxWidth: 360,
+    backgroundColor: 'rgba(255, 255, 255, 0.88)',
+    borderRadius: 20,
+    padding: 28,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 8,
   },
   heading: {
     fontSize: 26,
-    fontWeight: '800',
-    color: '#0f172a',
-    paddingHorizontal: 18,
-    paddingTop: 18,
-    paddingBottom: 6,
+    fontWeight: '700',
+    color: '#1f2937',
+    textAlign: 'center',
+    marginBottom: 8,
   },
-  headingDark: {
-    color: '#e5e7eb',
+  subheading: {
+    fontSize: 14,
+    color: '#6b7280',
+    textAlign: 'center',
+    marginBottom: 32,
   },
-  accent: {
-    color: '#8b5cf6',
+  topLogo: {
+    width: 120,
+    height: 120,
+    alignSelf: 'center',
+    marginBottom: 12,
   },
   inputWrapper: {
     position: 'relative',
-    backgroundColor: '#f1f5f9',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginTop: 12,
+    backgroundColor: '#f8fafc',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#eef0f6',
+    borderColor: '#e2e8f0',
     width: '100%',
-    maxWidth: 400,
+    minHeight: 52,
   },
   input: {
     fontSize: 16,
-    color: '#0f172a',
-    paddingVertical: 6,
+    color: '#1f2937',
+    paddingVertical: 0,
   },
   iconButton: {
     position: 'absolute',
-    right: 12,
-    top: '50%',
-    marginTop: -12,
-    height: 24,
-    width: 24,
+    right: 16,
+    top: 0,
+    bottom: 0,
+    width: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  inlineLinks: {
-    marginTop: 10,
-    marginHorizontal: 18,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  forgotLink: {
+    alignSelf: 'flex-end',
+    marginBottom: 24,
   },
   linkText: {
-    color: '#6b7280',
-    fontSize: 13,
+    color: '#6366f1',
+    fontSize: 14,
+    fontWeight: '500',
   },
   primaryButton: {
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: '#a855f7',
+    height: 52,
+    borderRadius: 16,
+    backgroundColor: '#cb54f8',
     alignItems: 'center',
     justifyContent: 'center',
-    marginHorizontal: 18,
-    marginTop: 16,
-    shadowColor: '#a855f7',
-    shadowOpacity: 0.35,
-    shadowOffset: { width: 0, height: 8 },
+    marginBottom: 24,
+    shadowColor: '#6a0dad',
+    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 4 },
     shadowRadius: 12,
     elevation: 4,
-    paddingHorizontal: 30,
   },
   primaryButtonText: {
     color: 'white',
-    fontWeight: '700',
+    fontWeight: '600',
     fontSize: 16,
   },
   primaryButtonDisabled: {
     opacity: 0.7,
   },
   hrRow: {
-    marginTop: 18,
-    marginHorizontal: 18,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    marginBottom: 24,
+    gap: 16,
   },
   hr: {
     flex: 1,
     height: 1,
-    backgroundColor: '#e5e7eb',
+    backgroundColor: '#e2e8f0',
   },
   orText: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#9ca3af',
+    fontWeight: '500',
   },
   socialRow: {
-    gap: 10,
-    marginTop: 14,
-    paddingHorizontal: 18,
     flexDirection: 'row',
-    justifyContent: 'space-evenly',
-  },
-  socialPill: {
-    height: 44,
-    width: 120,
-    borderRadius: 12,
-    backgroundColor: '#eef2f7',
-    alignItems: 'center',
+    gap: 16,
     justifyContent: 'center',
   },
+  socialButton: {
+    height: 48,
+    width: 48,
+    borderRadius: 12,
+    backgroundColor: '#f8fafc',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
   bottomTextBlock: {
-    marginTop: 10,
-    paddingHorizontal: 18,
+    marginTop: 32,
     alignItems: 'center',
   },
   metaText: {
-    color: '#6b7280',
+    color: '#111827',
+    fontSize: 15,
   },
   linkHighlight: {
-    color: '#8b5cf6',
+    color: 'purple',
     fontWeight: '600',
   },
 });

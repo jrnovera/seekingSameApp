@@ -1,10 +1,10 @@
 import {
-  createUserWithEmailAndPassword,
-  User as FirebaseUser,
-  getIdToken,
-  signInWithEmailAndPassword,
-  signOut,
-  updateProfile
+    createUserWithEmailAndPassword,
+    User as FirebaseUser,
+    getIdToken,
+    signInWithEmailAndPassword,
+    signOut,
+    updateProfile
 } from 'firebase/auth';
 import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';

@@ -4,7 +4,7 @@
     "slug": "seekingSame",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/androidicon.jpeg",
+    "icon": "./assets/images/newlogo.png",
     "scheme": "seekingsame",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -21,14 +21,14 @@
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/newlogo.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/Logo2.jpg",
+          "image": "./assets/images/newlogo.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",
