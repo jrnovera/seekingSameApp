@@ -1,17 +1,16 @@
-import React from 'react';
+import { PropertyWithCoordinates } from "@/stores/mapStore";
+import { Ionicons } from "@expo/vector-icons";
+import React from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Image,
   Dimensions,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { PropertyWithCoordinates } from '@/stores/mapStore';
-import RemoteImage from './remote-image';
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import RemoteImage from "./remote-image";
 
-const { width } = Dimensions.get('window');
+const { width } = Dimensions.get("window");
 
 interface PropertyInfoModalProps {
   property: PropertyWithCoordinates | null;
@@ -26,22 +25,26 @@ const PropertyInfoModal: React.FC<PropertyInfoModalProps> = ({
   visible,
   onClose,
   onBookNow,
-  modalPosition = { top: '15%', left: 16, right: 16 }
+  modalPosition = { top: "15%", left: 16, right: 16 },
 }) => {
   if (!visible || !property) return null;
 
   // Format price for display
   const formatPrice = (price: string | number | undefined): string => {
-    if (!price) return '$0';
-    const numPrice = typeof price === 'number' ? price : parseInt(String(price).replace(/[^0-9]/g, '') || '0');
+    if (!price) return "$0";
+    const numPrice =
+      typeof price === "number"
+        ? price
+        : parseInt(String(price).replace(/[^0-9]/g, "") || "0");
     return `$${numPrice}`;
   };
 
   // Get location display
   const getLocationDisplay = (): string => {
     if (property.cities) return property.cities;
-    if (property.location && typeof property.location === 'string') return property.location;
-    return 'Location not available';
+    if (property.location && typeof property.location === "string")
+      return property.location;
+    return "Location not available";
   };
 
   const handleBookNow = () => {
@@ -70,7 +73,7 @@ const PropertyInfoModal: React.FC<PropertyInfoModalProps> = ({
           {/* Property Info */}
           <View style={styles.propertyInfo}>
             <Text style={styles.propertyTitle} numberOfLines={1}>
-              {property.title || property.name || 'Property'}
+              {property.title || property.name || "Property"}
             </Text>
 
             {/* Property Details Row */}
@@ -121,7 +124,7 @@ const PropertyInfoModal: React.FC<PropertyInfoModalProps> = ({
 
 const styles = StyleSheet.create({
   overlay: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
@@ -130,17 +133,18 @@ const styles = StyleSheet.create({
   },
   backdrop: {
     flex: 1,
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
   },
   modalContainer: {
-    position: 'absolute',
+    position: "absolute",
     zIndex: 1001,
   },
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
+    paddingLeft: 7,
     borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: '#000',
+    overflow: "hidden",
+    shadowColor: "#000",
     shadowOffset: {
       width: 0,
       height: 8,
@@ -148,59 +152,60 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 12,
     elevation: 8,
-    flexDirection: 'row',
+    flexDirection: "row",
   },
   imageContainer: {
     width: 120,
     height: 140,
+    top: 10,
   },
   propertyImage: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
   },
   propertyInfo: {
     flex: 1,
     padding: 16,
-    justifyContent: 'space-between',
+    justifyContent: "space-between",
   },
   propertyTitle: {
     fontSize: 18,
-    fontWeight: '700',
-    color: '#333',
+    fontWeight: "700",
+    color: "#333",
     marginBottom: 8,
   },
   detailsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 6,
   },
   detailItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginRight: 16,
   },
   detailText: {
     fontSize: 12,
-    color: '#666',
+    color: "#666",
     marginLeft: 4,
   },
   priceText: {
     fontSize: 12,
-    color: '#666',
-    fontWeight: '500',
+    color: "#666",
+    fontWeight: "500",
   },
   bookButton: {
-    backgroundColor: '#FF6B9D',
+    backgroundColor: "#FF6B9D",
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 8,
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: 8,
   },
   bookButtonText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: "700",
     letterSpacing: 0.5,
   },
 });
