@@ -1,4 +1,6 @@
 import FilterModal, { FilterOptions } from '@/components/FilterModal'
+import MapPropertyView from '@/components/MapPropertyView'
+import MapToggleSwitch from '@/components/MapToggleSwitch'
 import RemoteImage from '@/components/remote-image'
 import { db } from '@/config/firebase'
 import { AntDesign, Ionicons } from '@expo/vector-icons'
@@ -28,6 +30,7 @@ const ViewListing = () => {
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [showFilterModal, setShowFilterModal] = useState(false)
+  const [isMapView, setIsMapView] = useState(false)
   const [activeFilters, setActiveFilters] = useState<FilterOptions>({
     city: '',
     state: '',
@@ -287,6 +290,12 @@ const ViewListing = () => {
           </TouchableOpacity>
         </View>
       )}
+
+      {/* Map Toggle Switch */}
+      <MapToggleSwitch
+        isMapView={isMapView}
+        onToggle={setIsMapView}
+      />
       
       {loading ? (
         <View style={styles.loadingContainer}>
@@ -303,13 +312,26 @@ const ViewListing = () => {
           ) : null}
         </View>
       ) : (
-        <FlatList
-          data={filteredProperties}
-          renderItem={renderPropertyItem}
-          keyExtractor={item => item.id}
-          contentContainerStyle={styles.listContainer}
-          showsVerticalScrollIndicator={false}
-        />
+        <>
+          {/* Conditional Rendering: List View or Map View */}
+          {isMapView ? (
+            <MapPropertyView
+              properties={filteredProperties}
+              onPropertySelect={(property) => {
+                // Handle property selection - will implement modal in next phase
+                console.log('Property selected:', property.title);
+              }}
+            />
+          ) : (
+            <FlatList
+              data={filteredProperties}
+              renderItem={renderPropertyItem}
+              keyExtractor={item => item.id}
+              contentContainerStyle={styles.listContainer}
+              showsVerticalScrollIndicator={false}
+            />
+          )}
+        </>
       )}
       
       {/* Filter Modal */}
