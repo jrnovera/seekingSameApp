@@ -7,6 +7,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  DimensionValue,
 } from "react-native";
 import RemoteImage from "./remote-image";
 
@@ -17,7 +18,11 @@ interface PropertyInfoModalProps {
   visible: boolean;
   onClose: () => void;
   onBookNow: (property: PropertyWithCoordinates) => void;
-  modalPosition?: { top: number | string; left: number; right: number };
+  modalPosition?: {
+    top: DimensionValue;
+    left: DimensionValue;
+    right: DimensionValue;
+  };
 }
 
 const PropertyInfoModal: React.FC<PropertyInfoModalProps> = ({
@@ -25,7 +30,7 @@ const PropertyInfoModal: React.FC<PropertyInfoModalProps> = ({
   visible,
   onClose,
   onBookNow,
-  modalPosition = { top: "15%", left: 16, right: 16 },
+  modalPosition = { top: "15%" as DimensionValue, left: 16, right: 16 },
 }) => {
   if (!visible || !property) return null;
 

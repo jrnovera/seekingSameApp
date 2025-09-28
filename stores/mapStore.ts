@@ -3,7 +3,9 @@ import { create } from 'zustand';
 export type PropertyWithCoordinates = {
   id: string;
   title?: string;
+  name?: string; // Alternative property name field
   imageUrl?: string | null;
+  photo?: string | null; // Alternative image field
   price?: string | number;
   location?: string;
   cities?: string;
@@ -12,6 +14,7 @@ export type PropertyWithCoordinates = {
   zipCode?: string;
   bedroomCount?: number;
   BathRoomCount?: number;
+  capacity?: number; // Number of people property can accommodate
   type?: string;
   // Computed coordinates
   latitude?: number;

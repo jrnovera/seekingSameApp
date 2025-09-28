@@ -8,6 +8,7 @@ import {
   Text,
   useColorScheme,
   View,
+  DimensionValue,
 } from "react-native";
 import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import PropertyInfoModal from "./PropertyInfoModal";
@@ -44,7 +45,11 @@ const MapPropertyView: React.FC<MapPropertyViewProps> = ({
 
   // Local state for modal
   const [showModal, setShowModal] = useState(false);
-  const [modalPosition, setModalPosition] = useState({
+  const [modalPosition, setModalPosition] = useState<{
+    top: DimensionValue;
+    left: DimensionValue;
+    right: DimensionValue;
+  }>({
     top: "15%",
     left: 16,
     right: 16,
@@ -167,14 +172,14 @@ const MapPropertyView: React.FC<MapPropertyViewProps> = ({
         );
 
         setModalPosition({
-          top: topPosition,
+          top: topPosition as DimensionValue,
           left: 16,
           right: 16,
         });
       } catch (error) {
         console.log("Error calculating marker position:", error);
         // Fallback to default position
-        setModalPosition({ top: "15%", left: 16, right: 16 });
+        setModalPosition({ top: "15%" as DimensionValue, left: 16, right: 16 });
       }
     }
 
@@ -252,11 +257,11 @@ const MapPropertyView: React.FC<MapPropertyViewProps> = ({
       </MapView>
 
       {/* Property count indicator */}
-      <View style={styles.propertyCountContainer}>
+      {/* <View style={styles.propertyCountContainer}>
         <Text style={styles.propertyCountText}>
           {markersToRender.length} properties in this area
         </Text>
-      </View>
+      </View> */}
 
       {/* Property Info Modal */}
       <PropertyInfoModal
