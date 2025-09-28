@@ -1,19 +1,18 @@
-import React, { useRef, useEffect, useState } from 'react';
+import { Colors } from "@/constants/theme";
+import { PropertyWithCoordinates, useMapStore } from "@/stores/mapStore";
+import { router } from "expo-router";
+import React, { useEffect, useRef, useState } from "react";
 import {
-  View,
+  Dimensions,
   StyleSheet,
   Text,
-  Dimensions,
   useColorScheme,
-} from 'react-native';
-import MapView, { PROVIDER_GOOGLE, Marker } from 'react-native-maps';
-import { router } from 'expo-router';
-import { Colors } from '@/constants/theme';
-import { useMapStore, PropertyWithCoordinates } from '@/stores/mapStore';
-import PropertyMarker from './PropertyMarker';
-import PropertyInfoModal from './PropertyInfoModal';
+  View,
+} from "react-native";
+import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
+import PropertyInfoModal from "./PropertyInfoModal";
 
-const { width, height } = Dimensions.get('window');
+const { width, height } = Dimensions.get("window");
 
 type Property = {
   id: string;
@@ -37,15 +36,19 @@ interface MapPropertyViewProps {
 
 const MapPropertyView: React.FC<MapPropertyViewProps> = ({
   properties,
-  onPropertySelect
+  onPropertySelect,
 }) => {
-  const scheme = useColorScheme() ?? 'light';
+  const scheme = useColorScheme() ?? "light";
   const C = Colors[scheme];
   const mapRef = useRef<MapView>(null);
 
   // Local state for modal
   const [showModal, setShowModal] = useState(false);
-  const [modalPosition, setModalPosition] = useState({ top: '15%', left: 16, right: 16 });
+  const [modalPosition, setModalPosition] = useState({
+    top: "15%",
+    left: 16,
+    right: 16,
+  });
 
   // Zustand store
   const {
@@ -55,13 +58,13 @@ const MapPropertyView: React.FC<MapPropertyViewProps> = ({
     setProperties,
     setSelectedProperty,
     setMapLoaded,
-    getPropertiesWithCoordinates
+    getPropertiesWithCoordinates,
   } = useMapStore();
 
   // Update store when properties change (only once per properties array)
   useEffect(() => {
     if (properties.length > 0) {
-      console.log('Setting properties in map store:', properties.length);
+      console.log("Setting properties in map store:", properties.length);
       setProperties(properties as PropertyWithCoordinates[]);
     }
   }, [properties.length, setProperties]); // Only re-run when length changes
@@ -71,11 +74,14 @@ const MapPropertyView: React.FC<MapPropertyViewProps> = ({
 
   // Debug logging
   useEffect(() => {
-    console.log('Original properties count:', properties.length);
-    console.log('Valid properties for markers:', validProperties.length);
+    console.log("Original properties count:", properties.length);
+    console.log("Valid properties for markers:", validProperties.length);
 
     if (properties.length > 0 && validProperties.length === 0) {
-      console.log('Properties exist but no valid coordinates. First property:', properties[0]);
+      console.log(
+        "Properties exist but no valid coordinates. First property:",
+        properties[0]
+      );
     }
 
     validProperties.forEach((prop, index) => {
@@ -83,43 +89,47 @@ const MapPropertyView: React.FC<MapPropertyViewProps> = ({
         id: prop.id,
         title: prop.title,
         lat: prop.latitude,
-        lng: prop.longitude
+        lng: prop.longitude,
       });
     });
   }, [validProperties.length, properties.length]);
 
   // Add fallback demo markers if no valid properties
-  const fallbackMarkers = validProperties.length === 0 ? [
-    {
-      id: 'demo-1',
-      title: 'Demo Property 1',
-      latitude: 37.7849,
-      longitude: -122.4094,
-      price: 150
-    },
-    {
-      id: 'demo-2',
-      title: 'Demo Property 2',
-      latitude: 37.7849 + 0.01,
-      longitude: -122.4094 + 0.01,
-      price: 200
-    },
-    {
-      id: 'demo-3',
-      title: 'Demo Property 3',
-      latitude: 37.7849 - 0.01,
-      longitude: -122.4094 - 0.01,
-      price: 175
-    }
-  ] : [];
+  const fallbackMarkers =
+    validProperties.length === 0
+      ? [
+          {
+            id: "demo-1",
+            title: "Demo Property 1",
+            latitude: 37.7849,
+            longitude: -122.4094,
+            price: 150,
+          },
+          {
+            id: "demo-2",
+            title: "Demo Property 2",
+            latitude: 37.7849 + 0.01,
+            longitude: -122.4094 + 0.01,
+            price: 200,
+          },
+          {
+            id: "demo-3",
+            title: "Demo Property 3",
+            latitude: 37.7849 - 0.01,
+            longitude: -122.4094 - 0.01,
+            price: 175,
+          },
+        ]
+      : [];
 
-  const markersToRender = validProperties.length > 0 ? validProperties : fallbackMarkers;
+  const markersToRender =
+    validProperties.length > 0 ? validProperties : fallbackMarkers;
 
   // Handle map load
   const handleMapReady = () => {
     if (!isMapLoaded) {
       setMapLoaded(true);
-      console.log('Map loaded successfully');
+      console.log("Map loaded successfully");
     }
   };
 
@@ -132,7 +142,7 @@ const MapPropertyView: React.FC<MapPropertyViewProps> = ({
       try {
         const coordinate = {
           latitude: property.latitude,
-          longitude: property.longitude
+          longitude: property.longitude,
         };
 
         // Get screen coordinates of the marker
@@ -145,22 +155,26 @@ const MapPropertyView: React.FC<MapPropertyViewProps> = ({
 
         // Position modal above the marker if there's space, otherwise below
         let topPosition = point.y - modalHeight - padding;
-        if (topPosition < 100) { // Too close to top
+        if (topPosition < 100) {
+          // Too close to top
           topPosition = point.y + 60; // Position below marker
         }
 
         // Ensure modal doesn't go off screen
-        topPosition = Math.max(60, Math.min(topPosition, screenHeight - modalHeight - 60));
+        topPosition = Math.max(
+          60,
+          Math.min(topPosition, screenHeight - modalHeight - 60)
+        );
 
         setModalPosition({
           top: topPosition,
           left: 16,
-          right: 16
+          right: 16,
         });
       } catch (error) {
-        console.log('Error calculating marker position:', error);
+        console.log("Error calculating marker position:", error);
         // Fallback to default position
-        setModalPosition({ top: '15%', left: 16, right: 16 });
+        setModalPosition({ top: "15%", left: 16, right: 16 });
       }
     }
 
@@ -178,7 +192,7 @@ const MapPropertyView: React.FC<MapPropertyViewProps> = ({
 
   // Handle book now
   const handleBookNow = (property: PropertyWithCoordinates) => {
-    console.log('Book now pressed for:', property.title);
+    console.log("Book now pressed for:", property.title);
 
     // Close modal first
     setShowModal(false);
@@ -212,7 +226,12 @@ const MapPropertyView: React.FC<MapPropertyViewProps> = ({
       >
         {/* Render property markers */}
         {markersToRender.map((property, index) => {
-          console.log(`Rendering marker ${index} for property:`, property.id, property.latitude, property.longitude);
+          console.log(
+            `Rendering marker ${index} for property:`,
+            property.id,
+            property.latitude,
+            property.longitude
+          );
           return (
             <Marker
               key={`marker-${property.id}`}
@@ -220,10 +239,12 @@ const MapPropertyView: React.FC<MapPropertyViewProps> = ({
                 latitude: property.latitude!,
                 longitude: property.longitude!,
               }}
-              onPress={() => handleMarkerPress(property as PropertyWithCoordinates)}
+              onPress={() =>
+                handleMarkerPress(property as PropertyWithCoordinates)
+              }
               title={property.title || `Property ${index + 1}`}
               description={`$${property.price}/month`}
-              pinColor="#FF6B9D"
+              image={require("@/assets/images/map-pin-icon.png")}
               tracksViewChanges={false}
             />
           );
@@ -252,23 +273,23 @@ const MapPropertyView: React.FC<MapPropertyViewProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    position: 'relative',
+    position: "relative",
   },
   map: {
     flex: 1,
     width: width,
-    height: '100%',
+    height: "100%",
   },
   propertyCountContainer: {
-    position: 'absolute',
+    position: "absolute",
     top: 16,
     left: 16,
     right: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    backgroundColor: "rgba(255, 255, 255, 0.95)",
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 8,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: {
       width: 0,
       height: 2,
@@ -279,9 +300,9 @@ const styles = StyleSheet.create({
   },
   propertyCountText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    textAlign: 'center',
+    fontWeight: "600",
+    color: "#333",
+    textAlign: "center",
   },
 });
 
