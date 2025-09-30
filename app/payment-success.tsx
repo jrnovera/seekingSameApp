@@ -1,8 +1,10 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, useColorScheme } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, useColorScheme, Alert } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { Colors } from '@/constants/theme';
+import { auth } from '@/config/firebase';
+import { propertyService } from '@/services/propertyService';
 
 export default function PaymentSuccess() {
   const {
@@ -21,6 +23,36 @@ export default function PaymentSuccess() {
 
   const scheme = useColorScheme() ?? 'light';
   const C = Colors[scheme as 'light' | 'dark'];
+  const [propertyUpdated, setPropertyUpdated] = useState(false);
+  const [updateError, setUpdateError] = useState<string | null>(null);
+
+  // Update property availability when component mounts
+  useEffect(() => {
+    const updatePropertyAvailability = async () => {
+      if (!propertyId || !auth.currentUser) {
+        console.log('Missing propertyId or user authentication');
+        return;
+      }
+
+      try {
+        console.log(`Marking property ${propertyId} as unavailable for user ${auth.currentUser.uid}`);
+        await propertyService.markPropertyAsRented(propertyId, auth.currentUser.uid);
+        setPropertyUpdated(true);
+        console.log('Property successfully marked as unavailable');
+      } catch (error) {
+        console.error('Failed to update property availability:', error);
+        setUpdateError('Failed to update property status');
+        // Show alert but don't block the success screen
+        Alert.alert(
+          'Warning',
+          'Payment successful, but we couldn\'t update the property status. Please contact support if you encounter any issues.',
+          [{ text: 'OK' }]
+        );
+      }
+    };
+
+    updatePropertyAvailability();
+  }, [propertyId]);
 
   const formatAmount = (amount: string, currency: string) => {
     const numAmount = parseFloat(amount) / 100; // Convert from cents

@@ -1,11 +1,10 @@
+import { PropertyWithCoordinates } from '@/stores/mapStore';
 import React from 'react';
 import {
-  View,
   StyleSheet,
   TouchableOpacity,
+  View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { PropertyWithCoordinates } from '@/stores/mapStore';
 
 interface PropertyMarkerProps {
   property: PropertyWithCoordinates;
@@ -32,17 +31,7 @@ const PropertyMarker: React.FC<PropertyMarkerProps> = ({
       activeOpacity={0.8}
     >
       {/* Main marker body - teardrop shape */}
-      <View style={[
-        styles.markerBody,
-        isSelected && styles.selectedBody
-      ]}>
-        {/* House icon */}
-        <Ionicons
-          name="home"
-          size={isSelected ? 14 : 12}
-          color="#FFFFFF"
-        />
-      </View>
+     
 
       {/* Marker point/tip */}
       <View style={[

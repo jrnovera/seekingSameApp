@@ -183,9 +183,9 @@ export default function Favorites() {
             }
           ]}
         > 
-          <TouchableOpacity 
+          <TouchableOpacity
             style={{ flex: 1 }}
-            onPress={() => item.propertyId && router.push(`/property/${item.propertyId}`)}
+            onPress={() => item.propertyId && router.push(`/property/details?id=${item.propertyId}`)}
             activeOpacity={0.7}
           >
             <View style={{ flexDirection: 'row' }}>
@@ -246,6 +246,7 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     borderWidth: 1,
     padding: 10,
+    marginBottom: 12,
   },
   photo: {
     height: 110,

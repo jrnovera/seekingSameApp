@@ -14,7 +14,10 @@ type Property = {
   title?: string;
   imageUrl?: string | null;
   price?: string | number;
-  location?: string;
+  location?: {
+    latitude: string;
+    longitude: string;
+  };
   cities?: string;
   address?: any;
   state?: string;
@@ -27,6 +30,7 @@ type Property = {
 const ViewListing = () => {
   const [properties, setProperties] = useState<Property[]>([])
   const [filteredProperties, setFilteredProperties] = useState<Property[]>([])
+  console.log("Check the filtered Properties", JSON.stringify(filteredProperties, null, 2))
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [showFilterModal, setShowFilterModal] = useState(false)
@@ -41,7 +45,7 @@ const ViewListing = () => {
     bedroomCount: undefined,
     capacity: undefined,
   })
-
+  
   // Fetch all properties
   useEffect(() => {
     const fetchProperties = async () => {
@@ -86,9 +90,8 @@ const ViewListing = () => {
     // Apply search query if present
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
-      filtered = filtered.filter(property => 
+      filtered = filtered.filter(property =>
         property.title?.toLowerCase().includes(query) ||
-        (typeof property.location === 'string' && property.location.toLowerCase().includes(query)) ||
         property.cities?.toLowerCase().includes(query) ||
         property.state?.toLowerCase().includes(query) ||
         property.zipCode?.includes(query) ||
@@ -198,11 +201,16 @@ const ViewListing = () => {
     if (formattedLocation) {
       return formattedLocation
     }
-    
-    if (typeof property.location === 'string' && property.location.trim() !== '') {
-      return property.location
+
+    // If we have coordinates, display them as a fallback
+    if (property.location && typeof property.location === 'object') {
+      const lat = parseFloat(property.location.latitude);
+      const lng = parseFloat(property.location.longitude);
+      if (!isNaN(lat) && !isNaN(lng)) {
+        return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+      }
     }
-    
+
     return 'Location not available'
   }
 

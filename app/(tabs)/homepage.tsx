@@ -3,6 +3,8 @@ import RemoteImage from '@/components/remote-image';
 import { auth, db } from '@/config/firebase';
 import { Colors } from '@/constants/theme';
 import { addSampleProperties } from '@/utils/sampleData';
+import { checkIfFavorited, createFavorite, removeFavorite } from '@/services/favoriteService';
+import { notificationService } from '@/services/notificationService';
 import { AntDesign, Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -70,6 +72,7 @@ export default function Homepage() {
   const C = Colors[scheme];
   const [userName, setUserName] = useState<string>('User');
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -180,6 +183,8 @@ export default function Homepage() {
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [loadingSampleData, setLoadingSampleData] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [favoritedProperties, setFavoritedProperties] = useState<Set<string>>(new Set());
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   const handleAddSampleData = async () => {
     setLoadingSampleData(true);
@@ -193,14 +198,80 @@ export default function Homepage() {
     }
   };
 
-  // Load user profile data
+  // Load user's favorite properties
+  const loadUserFavorites = async (userId: string) => {
+    try {
+      // For now, we'll check each property individually
+      // In a real app, you might want to batch this or use a different approach
+      const favoritePromises = properties.map(property =>
+        checkIfFavorited(userId, property.id)
+      );
+      const favoriteResults = await Promise.all(favoritePromises);
+
+      const favoriteIds = new Set<string>();
+      favoriteResults.forEach((favoriteId, index) => {
+        if (favoriteId) {
+          favoriteIds.add(properties[index].id);
+        }
+      });
+
+      setFavoritedProperties(favoriteIds);
+    } catch (error) {
+      console.error('Error loading favorites:', error);
+    }
+  };
+
+  // Toggle favorite status
+  const handleToggleFavorite = async (property: Property) => {
+    if (!currentUserId) {
+      alert('Please sign in to save favorites');
+      return;
+    }
+
+    try {
+      const isFavorited = favoritedProperties.has(property.id);
+
+      if (isFavorited) {
+        // Remove from favorites
+        const favoriteId = await checkIfFavorited(currentUserId, property.id);
+        if (favoriteId) {
+          await removeFavorite(favoriteId);
+          setFavoritedProperties(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(property.id);
+            return newSet;
+          });
+          console.log(`Removed "${property.title}" from favorites`);
+        }
+      } else {
+        // Add to favorites
+        await createFavorite({
+          userId: currentUserId,
+          propertyId: property.id,
+          title: property.title || property.name,
+          location: getLocationDisplay(property),
+          price: property.price,
+          type: property.type || property.category,
+          imageUrl: property.imageUrl
+        });
+        setFavoritedProperties(prev => new Set([...prev, property.id]));
+        console.log(`Added "${property.title}" to favorites`);
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+      alert('Failed to update favorites. Please try again.');
+    }
+  };
+
+  // Load user profile data and favorites
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       if (user) {
+        setCurrentUserId(user.uid);
         try {
           // Get user's display name from Firebase Auth
           let displayName = user.displayName || 'User';
-          
+
           // Try to get additional user data from Firestore
           const userDoc = await getDoc(doc(db, 'users', user.uid));
           if (userDoc.exists()) {
@@ -209,22 +280,62 @@ export default function Homepage() {
             displayName = userData.displayName || userData.name || displayName;
             setUserAvatar(userData.photoURL || userData.avatar || null);
           }
-          
+
           // Extract first name or use full name
           const firstName = displayName.split(' ')[0];
           setUserName(firstName);
+
+          // Load user's favorite properties
+          await loadUserFavorites(user.uid);
         } catch (error) {
           console.error('Error fetching user data:', error);
         }
       } else {
+        setCurrentUserId(null);
         setUserName('Guest');
         setUserAvatar(null);
+        setFavoritedProperties(new Set());
       }
     });
-    
+
     return () => unsubscribeAuth();
   }, []);
-  
+
+  // Listen to unread notification count
+  useEffect(() => {
+    let unsubscribeNotificationCount: (() => void) | null = null;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      // Cleanup previous listener
+      if (unsubscribeNotificationCount) {
+        unsubscribeNotificationCount();
+        unsubscribeNotificationCount = null;
+      }
+
+      if (user) {
+        // Listen to unread notification count
+        unsubscribeNotificationCount = notificationService.listenToUnreadCount(
+          user.uid,
+          (count) => {
+            setUnreadNotificationCount(count);
+          },
+          (error) => {
+            console.error('Error listening to notification count:', error);
+          }
+        );
+      } else {
+        setUnreadNotificationCount(0);
+      }
+    });
+
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeNotificationCount) {
+        unsubscribeNotificationCount();
+      }
+    };
+  }, []);
+
   // Start entrance animations
   useEffect(() => {
     Animated.parallel([
@@ -398,6 +509,13 @@ export default function Homepage() {
 
     return () => unsubscribe();
   }, []);
+
+  // Reload favorites when properties change and user is logged in
+  useEffect(() => {
+    if (currentUserId && properties.length > 0) {
+      loadUserFavorites(currentUserId);
+    }
+  }, [currentUserId, properties.length]);
 
   // Check if search or filters are active
   const isSearchActive = () => {
@@ -597,18 +715,38 @@ export default function Homepage() {
       {/* Greeting header */}
       <View style={styles.headerRow}>
         <Text style={[styles.heyText, { color: C.text }]}>Hey, <Text style={{ color: '#3c95a6', fontWeight: '800' }}>{userName}</Text></Text>
-        <TouchableOpacity 
-          onPress={() => router.push('/profile')}
-          activeOpacity={0.8}
-        >
-          {userAvatar ? (
-            <Image source={{ uri: userAvatar }} style={styles.avatar} />
-          ) : (
-            <View style={[styles.avatar, { backgroundColor: C.tint }]}>
-              <Text style={styles.avatarText}>{userName.charAt(0).toUpperCase()}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          {/* Notification Bell */}
+          <TouchableOpacity
+            style={[styles.notificationBell, { backgroundColor: C.surface }]}
+            onPress={() => router.push('/notifications')}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="notifications-outline" size={20} color={C.text} />
+            {/* Show badge only when there are unread notifications */}
+            {unreadNotificationCount > 0 && (
+              <View style={styles.notificationBadge}>
+                <Text style={styles.notificationBadgeText}>
+                  {unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          {/* Profile Avatar */}
+          <TouchableOpacity
+            onPress={() => router.push('/profile')}
+            activeOpacity={0.8}
+          >
+            {userAvatar ? (
+              <Image source={{ uri: userAvatar }} style={styles.avatar} />
+            ) : (
+              <View style={[styles.avatar, { backgroundColor: C.tint }]}>
+                <Text style={styles.avatarText}>{userName.charAt(0).toUpperCase()}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Add Sample Data Button (temporary) */}
@@ -803,8 +941,16 @@ export default function Homepage() {
                     <View style={styles.metaRow}>
                       <MaterialIcons name="location-on" size={14} color="#666" />
                       <Text style={[styles.metaText, { color: C.textMuted }]}>{getLocationDisplay(item)}</Text>
-                      <TouchableOpacity style={styles.heartButton} activeOpacity={0.8}>
-                        <AntDesign name="heart" size={18} color="#3c95a6" />
+                      <TouchableOpacity
+                        style={styles.heartButton}
+                        activeOpacity={0.8}
+                        onPress={() => handleToggleFavorite(item)}
+                      >
+                        <AntDesign
+                          name={favoritedProperties.has(item.id) ? "heart" : "hearto"}
+                          size={18}
+                          color={favoritedProperties.has(item.id) ? "#FF6B9D" : "#3c95a6"}
+                        />
                       </TouchableOpacity>
                     </View>
                     
@@ -942,8 +1088,16 @@ export default function Homepage() {
               <View style={styles.metaRow}>
                 <Ionicons name="location" size={14} color={C.icon} />
                 <Text style={[styles.metaText, { color: C.textMuted }]}>{getLocationDisplay(l)}</Text>
-                <TouchableOpacity style={styles.heartButtonSmall} activeOpacity={0.8}>
-                  <AntDesign name="heart" size={14} color="#3c95a6" />
+                <TouchableOpacity
+                  style={styles.heartButtonSmall}
+                  activeOpacity={0.8}
+                  onPress={() => handleToggleFavorite(l)}
+                >
+                  <AntDesign
+                    name={favoritedProperties.has(l.id) ? "heart" : "hearto"}
+                    size={14}
+                    color={favoritedProperties.has(l.id) ? "#FF6B9D" : "#3c95a6"}
+                  />
                 </TouchableOpacity>
               </View>
               
@@ -1069,6 +1223,42 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  notificationBell: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    backgroundColor: '#FF6B9D',
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  notificationBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '600',
   },
   heyText: {
     fontSize: 22,

@@ -10,6 +10,7 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, useColorScheme, View } from 'react-native';
 import { createFavorite, checkIfFavorited, removeFavorite } from '@/services/favoriteService';
 import { paymentService } from '@/services/paymentService';
+import { propertyService } from '@/services/propertyService';
 import conversationService from '@/services/conversationService';
 import reviewService, { Review } from '@/services/reviewService';
 import ReviewModal from '@/components/ReviewModal';
@@ -40,6 +41,8 @@ type Property = {
   createdby?: string;
   address?: string;
   rating?: number;
+  isAvailable?: boolean;
+  rentedBy?: string;
 };
 
 
@@ -220,6 +223,18 @@ export default function PropertyDetails() {
     }
 
     if (paymentLoading) return;
+
+    // Check if property is available for rent
+    if (property.isAvailable === false) {
+      Alert.alert('Property Unavailable', 'This property is currently not available for rent.');
+      return;
+    }
+
+    // Check if user is trying to rent their own property
+    if (property.createdby === auth.currentUser.uid) {
+      Alert.alert('Invalid Action', 'You cannot rent your own property.');
+      return;
+    }
 
     try {
       setPaymentLoading(true);
@@ -1005,17 +1020,34 @@ export default function PropertyDetails() {
         </TouchableOpacity>
         
         <TouchableOpacity
-          style={[styles.rentButton, { backgroundColor: paymentLoading ? C.surfaceSoft : C.tint }]}
+          style={[
+            styles.rentButton,
+            {
+              backgroundColor: paymentLoading
+                ? C.surfaceSoft
+                : (property?.isAvailable === false
+                  ? '#666'
+                  : C.tint
+                )
+            }
+          ]}
           onPress={handleRentPress}
-          disabled={paymentLoading}
+          disabled={paymentLoading || property?.isAvailable === false}
         >
           {paymentLoading ? (
             <ActivityIndicator size="small" color="#fff" />
+          ) : property?.isAvailable === false ? (
+            <MaterialIcons name="block" size={20} color="#fff" />
           ) : (
             <MaterialIcons name="payment" size={20} color="#fff" />
           )}
           <Text style={styles.rentButtonText}>
-            {paymentLoading ? 'Processing...' : 'Rent Now'}
+            {paymentLoading
+              ? 'Processing...'
+              : property?.isAvailable === false
+                ? 'Not Available'
+                : 'Rent Now'
+            }
           </Text>
         </TouchableOpacity>
       </View>

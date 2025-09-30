@@ -4,14 +4,15 @@ import { router } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
   Dimensions,
+  DimensionValue,
   StyleSheet,
   Text,
   useColorScheme,
   View,
-  DimensionValue,
 } from "react-native";
 import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import PropertyInfoModal from "./PropertyInfoModal";
+import PropertyMarker from "./PropertyMarker";
 
 const { width, height } = Dimensions.get("window");
 
@@ -20,7 +21,10 @@ type Property = {
   title?: string;
   imageUrl?: string | null;
   price?: string | number;
-  location?: string;
+  location?: {
+    latitude: string;
+    longitude: string;
+  };
   cities?: string;
   address?: any;
   state?: string;
@@ -66,69 +70,52 @@ const MapPropertyView: React.FC<MapPropertyViewProps> = ({
     getPropertiesWithCoordinates,
   } = useMapStore();
 
-  // Update store when properties change (only once per properties array)
+  // Extract coordinates directly from properties and create markers
+  const markersToRender = properties
+    .filter(property => {
+      // Check if location object exists and has valid coordinates
+      if (!property.location || typeof property.location !== 'object') return false;
+
+      const lat = property.location.latitude;
+      const lng = property.location.longitude;
+
+      // Skip empty strings or invalid coordinates
+      if (!lat || !lng || lat === "" || lng === "") return false;
+
+      const latitude = parseFloat(lat);
+      const longitude = parseFloat(lng);
+
+      return !isNaN(latitude) && !isNaN(longitude);
+    })
+    .map(property => ({
+      ...property,
+      latitude: parseFloat(property.location!.latitude),
+      longitude: parseFloat(property.location!.longitude)
+    }));
+
+  console.log("MapPropertyView: Markers to render:", markersToRender.length);
+  markersToRender.forEach((marker, i) => {
+    console.log(`Marker ${i}: ${marker.title} - ${marker.latitude}, ${marker.longitude}`);
+  });
+
+  // Auto-fit map to show all markers
   useEffect(() => {
-    if (properties.length > 0) {
-      console.log("Setting properties in map store:", properties.length);
-      setProperties(properties as PropertyWithCoordinates[]);
+    if (markersToRender.length > 0 && isMapLoaded && mapRef.current) {
+      console.log("Auto-fitting map to show", markersToRender.length, "markers");
+
+      const coordinates = markersToRender.map(marker => ({
+        latitude: marker.latitude,
+        longitude: marker.longitude,
+      }));
+
+      setTimeout(() => {
+        mapRef.current?.fitToCoordinates(coordinates, {
+          edgePadding: { top: 100, right: 100, bottom: 100, left: 100 },
+          animated: true,
+        });
+      }, 1000);
     }
-  }, [properties.length, setProperties]); // Only re-run when length changes
-
-  // Get properties with valid coordinates
-  const validProperties = getPropertiesWithCoordinates();
-
-  // Debug logging
-  useEffect(() => {
-    console.log("Original properties count:", properties.length);
-    console.log("Valid properties for markers:", validProperties.length);
-
-    if (properties.length > 0 && validProperties.length === 0) {
-      console.log(
-        "Properties exist but no valid coordinates. First property:",
-        properties[0]
-      );
-    }
-
-    validProperties.forEach((prop, index) => {
-      console.log(`Property ${index}:`, {
-        id: prop.id,
-        title: prop.title,
-        lat: prop.latitude,
-        lng: prop.longitude,
-      });
-    });
-  }, [validProperties.length, properties.length]);
-
-  // Add fallback demo markers if no valid properties
-  const fallbackMarkers =
-    validProperties.length === 0
-      ? [
-          {
-            id: "demo-1",
-            title: "Demo Property 1",
-            latitude: 37.7849,
-            longitude: -122.4094,
-            price: 150,
-          },
-          {
-            id: "demo-2",
-            title: "Demo Property 2",
-            latitude: 37.7849 + 0.01,
-            longitude: -122.4094 + 0.01,
-            price: 200,
-          },
-          {
-            id: "demo-3",
-            title: "Demo Property 3",
-            latitude: 37.7849 - 0.01,
-            longitude: -122.4094 - 0.01,
-            price: 175,
-          },
-        ]
-      : [];
-
-  const markersToRender =
-    validProperties.length > 0 ? validProperties : fallbackMarkers;
+  }, [markersToRender.length, isMapLoaded]);
 
   // Handle map load
   const handleMapReady = () => {
@@ -230,38 +217,45 @@ const MapPropertyView: React.FC<MapPropertyViewProps> = ({
         moveOnMarkerPress={false}
       >
         {/* Render property markers */}
-        {markersToRender.map((property, index) => {
+        {markersToRender.map((marker, index) => {
           console.log(
-            `Rendering marker ${index} for property:`,
-            property.id,
-            property.latitude,
-            property.longitude
+            `Rendering marker ${index}:`,
+            marker.title,
+            marker.latitude,
+            marker.longitude
           );
           return (
             <Marker
-              key={`marker-${property.id}`}
+              key={`marker-${marker.id}-${index}`}
               coordinate={{
-                latitude: property.latitude!,
-                longitude: property.longitude!,
+                latitude: marker.latitude,
+                longitude: marker.longitude,
               }}
               onPress={() =>
-                handleMarkerPress(property as PropertyWithCoordinates)
+                handleMarkerPress(marker as PropertyWithCoordinates)
               }
-              title={property.title || `Property ${index + 1}`}
-              description={`$${property.price}/month`}
+              title={marker.title || `Property ${index + 1}`}
+              description={`$${marker.price}/month`}
               image={require("@/assets/images/map-pin-icon.png")}
+
               tracksViewChanges={false}
-            />
+            >
+              <PropertyMarker
+                property={marker as PropertyWithCoordinates}
+                onPress={handleMarkerPress}
+                isSelected={selectedProperty?.id === marker.id}
+              />
+            </Marker>
           );
         })}
       </MapView>
 
       {/* Property count indicator */}
-      {/* <View style={styles.propertyCountContainer}>
-        <Text style={styles.propertyCountText}>
-          {markersToRender.length} properties in this area
+      <View style={styles.propertyCountContainer}>
+        <Text style={[styles.propertyCountText, { color: C.text }]}>
+          {markersToRender.length} {markersToRender.length === 1 ? 'property' : 'properties'} in this area
         </Text>
-      </View> */}
+      </View>
 
       {/* Property Info Modal */}
       <PropertyInfoModal
