@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, useColorScheme, Alert } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import { Colors } from '@/constants/theme';
 import { auth } from '@/config/firebase';
+import { Colors } from '@/constants/theme';
 import { propertyService } from '@/services/propertyService';
+import { transactionService } from '@/services/transactionService';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { router, useLocalSearchParams } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, useColorScheme, View } from 'react-native';
 
 export default function PaymentSuccess() {
   const {
@@ -24,35 +25,112 @@ export default function PaymentSuccess() {
   const scheme = useColorScheme() ?? 'light';
   const C = Colors[scheme as 'light' | 'dark'];
   const [propertyUpdated, setPropertyUpdated] = useState(false);
+  const [transactionCreated, setTransactionCreated] = useState(false);
+  const [processing, setProcessing] = useState(true);
   const [updateError, setUpdateError] = useState<string | null>(null);
+  const [hasProcessed, setHasProcessed] = useState(false);
 
-  // Update property availability when component mounts
+  // Update property availability and create transaction when component mounts
   useEffect(() => {
-    const updatePropertyAvailability = async () => {
-      if (!propertyId || !auth.currentUser) {
-        console.log('Missing propertyId or user authentication');
+    const processSuccessfulPayment = async () => {
+      // Prevent duplicate processing
+      if (hasProcessed) {
+        console.log('Payment already processed, skipping...');
         return;
       }
 
+      if (!propertyId || !sessionId || !auth.currentUser) {
+        console.log('Missing required data for payment processing:', {
+          propertyId: !!propertyId,
+          sessionId: !!sessionId,
+          currentUser: !!auth.currentUser
+        });
+        setProcessing(false);
+        setUpdateError('Missing required payment data');
+        return;
+      }
+
+      setHasProcessed(true);
+
+      const user = auth.currentUser;
+      console.log('Starting payment processing for:', {
+        propertyId,
+        sessionId,
+        userId: user.uid,
+        amount: amount,
+        currency: currency
+      });
+
+      let propertyUpdateSuccess = false;
+      let transactionCreateSuccess = false;
+
       try {
-        console.log(`Marking property ${propertyId} as unavailable for user ${auth.currentUser.uid}`);
-        await propertyService.markPropertyAsRented(propertyId, auth.currentUser.uid);
+        // 1. Mark property as unavailable
+        console.log(`Step 1: Marking property ${propertyId} as unavailable for user ${user.uid}`);
+        await propertyService.markPropertyAsRented(propertyId, user.uid);
+        propertyUpdateSuccess = true;
         setPropertyUpdated(true);
-        console.log('Property successfully marked as unavailable');
+        console.log('✅ Property successfully marked as unavailable');
+
+        // 2. Create transaction record
+        console.log(`Step 2: Creating transaction record for session ${sessionId}`);
+        const transactionData = {
+          amount: parseFloat(amount),
+          currency: currency || 'USD',
+          stripeSessionId: sessionId,
+          propertyId: propertyId,
+          propertyTitle: propertyTitle || 'Property Rental',
+          renterId: user.uid,
+          renterName: user.displayName || user.email?.split('@')[0] || 'User',
+          renterEmail: user.email || '',
+          metadata: {
+            paymentMethod: 'stripe_checkout',
+            source: 'mobile_app',
+            platform: 'mobile',
+            sessionId: sessionId,
+          },
+        };
+
+        console.log('Transaction data to be created:', transactionData);
+        const transactionId = await transactionService.createRentalTransactionWithHostLookup(transactionData);
+
+        transactionCreateSuccess = true;
+        setTransactionCreated(true);
+        console.log('✅ Transaction record created successfully:', transactionId);
+
+        // Both operations completed successfully
+        console.log('✅ Payment processing completed successfully');
+
       } catch (error) {
-        console.error('Failed to update property availability:', error);
-        setUpdateError('Failed to update property status');
-        // Show alert but don't block the success screen
+        console.error('❌ Failed to process successful payment:', error);
+
+        // Determine what failed for better error messaging
+        let errorMessage = 'We encountered issues completing the payment process.';
+        let detailMessage = '';
+
+        if (!propertyUpdateSuccess) {
+          errorMessage = 'Failed to update property availability.';
+          detailMessage = 'The property status could not be updated. ';
+        } else if (!transactionCreateSuccess) {
+          errorMessage = 'Failed to create transaction record.';
+          detailMessage = 'Property was updated but transaction record creation failed. ';
+        }
+
+        setUpdateError(errorMessage);
+
+        // Show specific error alert
         Alert.alert(
-          'Warning',
-          'Payment successful, but we couldn\'t update the property status. Please contact support if you encounter any issues.',
+          'Payment Processing Issue',
+          `Your payment was successful! However, ${detailMessage}Please contact support with your session ID: ${sessionId.substring(0, 20)}... if you need assistance.`,
           [{ text: 'OK' }]
         );
+      } finally {
+        setProcessing(false);
       }
     };
 
-    updatePropertyAvailability();
-  }, [propertyId]);
+    processSuccessfulPayment();
+  }, [propertyId, sessionId, amount, currency, propertyTitle]);
 
   const formatAmount = (amount: string, currency: string) => {
     const numAmount = parseFloat(amount) / 100; // Convert from cents
@@ -90,6 +168,34 @@ export default function PaymentSuccess() {
           <Text style={[styles.successMessage, { color: C.textMuted }]}>
             Your payment has been processed successfully.
           </Text>
+
+          {/* Processing Status */}
+          {processing && (
+            <View style={styles.processingContainer}>
+              <ActivityIndicator size="small" color={C.tint} style={styles.processingSpinner} />
+              <Text style={[styles.processingText, { color: C.textMuted }]}>
+                Completing payment processing...
+              </Text>
+            </View>
+          )}
+
+          {!processing && (propertyUpdated && transactionCreated) && (
+            <View style={styles.statusContainer}>
+              <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+              <Text style={[styles.statusText, { color: '#10B981' }]}>
+                Processing completed successfully
+              </Text>
+            </View>
+          )}
+
+          {!processing && updateError && (
+            <View style={styles.statusContainer}>
+              <Ionicons name="warning" size={20} color="#F59E0B" />
+              <Text style={[styles.statusText, { color: '#F59E0B' }]}>
+                {updateError}
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Payment Details */}
@@ -209,6 +315,31 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
     lineHeight: 22,
+  },
+  processingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 16,
+    paddingVertical: 8,
+  },
+  processingSpinner: {
+    marginRight: 8,
+  },
+  processingText: {
+    fontSize: 14,
+  },
+  statusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 16,
+    paddingVertical: 8,
+  },
+  statusText: {
+    fontSize: 14,
+    marginLeft: 8,
+    fontWeight: '500',
   },
   detailsContainer: {
     padding: 20,

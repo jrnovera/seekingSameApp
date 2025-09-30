@@ -1,19 +1,18 @@
 import RemoteImage from '@/components/remote-image';
+import ReviewModal from '@/components/ReviewModal';
 import { auth, db } from '@/config/firebase';
 import { Colors } from '@/constants/theme';
-import { FontAwesome, Ionicons, MaterialCommunityIcons, MaterialIcons, Entypo } from '@expo/vector-icons';
+import conversationService from '@/services/conversationService';
+import { checkIfFavorited, createFavorite, removeFavorite } from '@/services/favoriteService';
+import { paymentService } from '@/services/paymentService';
+import reviewService, { Review } from '@/services/reviewService';
+import { Entypo, FontAwesome, Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import * as Linking from 'expo-linking';
-import * as WebBrowser from 'expo-web-browser';
 import { router, useLocalSearchParams } from 'expo-router';
-import { addDoc, collection, deleteDoc, doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import * as WebBrowser from 'expo-web-browser';
+import { doc, getDoc } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, useColorScheme, View } from 'react-native';
-import { createFavorite, checkIfFavorited, removeFavorite } from '@/services/favoriteService';
-import { paymentService } from '@/services/paymentService';
-import { propertyService } from '@/services/propertyService';
-import conversationService from '@/services/conversationService';
-import reviewService, { Review } from '@/services/reviewService';
-import ReviewModal from '@/components/ReviewModal';
 
 type Property = {
   id: string;
@@ -49,6 +48,7 @@ type Property = {
 export default function PropertyDetails() {
   const { id } = useLocalSearchParams();
   const [property, setProperty] = useState<Property | null>(null);
+  console.log("CHeck property:", JSON.stringify(property, null,2))
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -664,6 +664,7 @@ export default function PropertyDetails() {
             photo: data.photo,
             samplePhotos: samplePhotos,
             cities: data.city ?? data.cities ?? undefined,
+            isAvailable: data.isAvailable,
             state: data.state ?? undefined,
             description: data.description ?? data.descriptions ?? undefined,
             descriptions: data.descriptions,
