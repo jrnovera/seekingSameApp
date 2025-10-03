@@ -5,13 +5,12 @@ import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
-  Animated,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   useColorScheme,
-  View,
+  View
 } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 

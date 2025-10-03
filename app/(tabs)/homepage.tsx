@@ -2,9 +2,9 @@ import FilterModal, { FilterOptions } from '@/components/FilterModal';
 import RemoteImage from '@/components/remote-image';
 import { auth, db } from '@/config/firebase';
 import { Colors } from '@/constants/theme';
-import { addSampleProperties } from '@/utils/sampleData';
 import { checkIfFavorited, createFavorite, removeFavorite } from '@/services/favoriteService';
 import { notificationService } from '@/services/notificationService';
+import { addSampleProperties } from '@/utils/sampleData';
 import { AntDesign, Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -947,7 +947,7 @@ export default function Homepage() {
                         onPress={() => handleToggleFavorite(item)}
                       >
                         <AntDesign
-                          name={favoritedProperties.has(item.id) ? "heart" : "hearto"}
+                        name={favoritedProperties.has(item.id) ? "heart" : "heart-o" as any}
                           size={18}
                           color={favoritedProperties.has(item.id) ? "#FF6B9D" : "#3c95a6"}
                         />
@@ -1094,7 +1094,7 @@ export default function Homepage() {
                   onPress={() => handleToggleFavorite(l)}
                 >
                   <AntDesign
-                    name={favoritedProperties.has(l.id) ? "heart" : "hearto"}
+                    name={favoritedProperties.has(l.id) ? "heart" : "heart-o" as any}
                     size={14}
                     color={favoritedProperties.has(l.id) ? "#FF6B9D" : "#3c95a6"}
                   />

@@ -1,18 +1,18 @@
-import React, { useState, useRef } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Modal,
-  TouchableOpacity,
-  TextInput,
-  ScrollView,
-  useColorScheme,
-  PanResponder,
-  Animated,
-} from 'react-native';
-import { AntDesign } from '@expo/vector-icons';
 import { Colors } from '@/constants/theme';
+import { AntDesign } from '@expo/vector-icons';
+import React, { useRef, useState } from 'react';
+import {
+    Animated,
+    Modal,
+    PanResponder,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    useColorScheme,
+    View,
+} from 'react-native';
 // Using built-in components instead of external slider
 
 export interface FilterOptions {

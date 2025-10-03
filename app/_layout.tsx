@@ -55,6 +55,7 @@ export default function RootLayout() {
             <Stack.Screen name="payment-failed" options={{ headerShown: false }} />
             <Stack.Screen name="viewlisting" options={{ headerShown: false }} />
             <Stack.Screen name="notifications" options={{headerShown: false}} />
+            <Stack.Screen name="my-bookings" options={{headerShown: false}} />
           </Stack>
           <StatusBar style="auto" />
         </ThemeProvider>

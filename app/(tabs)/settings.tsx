@@ -80,8 +80,13 @@ export default function SettingsScreen() {
           label="Personal Information" 
           description="Update your profile details"
         />
-        
-       
+        <Divider color={C.surfaceBorder} />
+        <RowItem 
+          icon={<MaterialIcons name="book-online" size={20} color={C.tint} />} 
+          label="My Bookings" 
+          description="View your booking history and transactions"
+          onPress={() => router.push('/my-bookings')}
+        />
       </View>
 
       {/* Preferences Section - New */}

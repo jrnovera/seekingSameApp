@@ -231,8 +231,60 @@ class TransactionService {
       return null;
     }
   }
+
+  /**
+   * Get all transactions for a specific user (as renter)
+   */
+  async getUserBookings(userId: string): Promise<RentalTransaction[]> {
+    try {
+      const q = query(
+        collection(db, 'transactions'),
+        where('renterId', '==', userId),
+        where('type', '==', 'rental_payment')
+      );
+
+      const snapshot = await getDocs(q);
+      
+      if (snapshot.empty) {
+        return [];
+      }
+
+      return snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        createdAt: doc.data().createdAt?.toDate() || new Date(),
+        updatedAt: doc.data().updatedAt?.toDate() || new Date(),
+      })) as RentalTransaction[];
+    } catch (error) {
+      console.error('Error getting user bookings:', error);
+      return [];
+    }
+  }
+  
+  /**
+   * Get transaction by ID
+   */
+  async getTransactionById(transactionId: string): Promise<RentalTransaction | null> {
+    try {
+      const transactionRef = doc(db, 'transactions', transactionId);
+      const transactionDoc = await getDoc(transactionRef);
+
+      if (!transactionDoc.exists()) {
+        return null;
+      }
+
+      return {
+        id: transactionDoc.id,
+        ...transactionDoc.data(),
+        createdAt: transactionDoc.data().createdAt?.toDate() || new Date(),
+        updatedAt: transactionDoc.data().updatedAt?.toDate() || new Date(),
+      } as RentalTransaction;
+    } catch (error) {
+      console.error('Error getting transaction by ID:', error);
+      return null;
+    }
+  }
 }
 
 // Export singleton instance
 export const transactionService = new TransactionService();
-export default TransactionService;
