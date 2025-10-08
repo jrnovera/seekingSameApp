@@ -98,6 +98,35 @@ class TransactionService {
       const docRef = await addDoc(collection(db, 'transactions'), transactionData);
 
       console.log('Rental transaction created successfully:', docRef.id);
+
+      // Create notification for rental payment (visible to admin and host)
+      try {
+        const notificationData = {
+          type: 'rental_payment',
+          title: 'New Rental Payment Received',
+          message: `${params.renterName} paid $${(params.amount / 100).toFixed(2)} for "${params.propertyTitle}"`,
+          userId: params.renterId, // User who triggered this notification
+          visibleTo: [params.hostId], // Visible to the property owner/host
+          roles: ['admin'], // Also visible to admins
+          metadata: {
+            propertyId: params.propertyId,
+            propertyTitle: params.propertyTitle,
+            amount: params.amount,
+            transactionId: docRef.id,
+            renterId: params.renterId,
+            hostId: params.hostId
+          },
+          isRead: false,
+          createdAt: serverTimestamp() as any
+        };
+
+        await addDoc(collection(db, 'notifications'), notificationData);
+        console.log('Rental payment notification created');
+      } catch (notifError) {
+        console.error('Error creating rental payment notification:', notifError);
+        // Don't fail the whole operation if notification fails
+      }
+
       return docRef.id;
     } catch (error) {
       console.error('Error creating rental transaction:', error);
