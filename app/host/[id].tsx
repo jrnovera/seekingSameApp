@@ -6,15 +6,15 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { collection, doc, getDoc, getDocs, query } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Image,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-  useColorScheme
+    ActivityIndicator,
+    Image,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+    useColorScheme
 } from 'react-native';
 
 type HostProfile = {
@@ -334,7 +334,7 @@ export default function HostProfile() {
           // Try to find properties that might be related to this host in other ways
           const possibleMatches = propertiesSnap.docs.filter(doc => {
             const data = doc.data();
-            const hostName = host.name.toLowerCase();
+            const hostName = host.display_name.toLowerCase();
             
             // Check if host name appears in property title or description
             return (
