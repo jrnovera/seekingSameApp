@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -17,12 +17,15 @@ import {
 import { AntDesign, Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import commentService from '@/services/commentService';
+import { useAuth } from '@/contexts/AuthContext';
+import { Timestamp } from 'firebase/firestore';
 
 interface Comment {
   id: string;
   userId: string;
   userName: string;
-  userPhoto?: string;
+  userPhoto?: string | null;
   text: string;
   timestamp: Date;
 }
@@ -43,58 +46,66 @@ export default function CommentsModal({
   onClose,
   listingId,
   listingTitle,
-  listingImage = 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267',
-  listingDescription = 'Looking for a roommate! Available room in a sunny 2-bedroom apartment in Downtown. Spacious kitchen, living room, and in-unit laundry. Rent: $1,500/month + utilities. DM for details! #roommate #rental #downtown',
-  userName = 'Sophia Carter',
-  userPhoto = 'https://randomuser.me/api/portraits/women/44.jpg',
+  listingImage,
+  listingDescription,
+  userName = 'User',
+  userPhoto,
 }: CommentsModalProps) {
   const scheme = useColorScheme() ?? 'light';
   const C = Colors[scheme];
-  
+  const { userDoc } = useAuth();
+
   const [comment, setComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [comments, setComments] = useState<Comment[]>([
-    {
-      id: '1',
-      userId: 'user2',
-      userName: 'Ethan Bennett',
-      userPhoto: 'https://randomuser.me/api/portraits/men/43.jpg',
-      text: 'Just sent you a message! Very interested.',
-      timestamp: new Date(Date.now() - 3600000), // 1 hour ago
-    },
-    {
-      id: '2',
-      userId: 'user3',
-      userName: 'Chris Hayes',
-      userPhoto: 'https://randomuser.me/api/portraits/men/22.jpg',
-      text: 'Looks like a great place! I hope you find someone soon.',
-      timestamp: new Date(Date.now() - 7200000), // 2 hours ago
-    },
-  ]);
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const handleSubmitComment = () => {
-    if (!comment.trim()) return;
-    
+  // Subscribe to comments when modal opens
+  useEffect(() => {
+    if (!visible || !listingId) return;
+
+    setIsLoading(true);
+    const unsubscribe = commentService.subscribeToComments(listingId, (fetchedComments) => {
+      // Convert Timestamp to Date
+      const commentsWithDates = fetchedComments.map(comment => ({
+        ...comment,
+        timestamp: comment.createdAt instanceof Timestamp
+          ? comment.createdAt.toDate()
+          : new Date(),
+      }));
+      setComments(commentsWithDates);
+      setIsLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [visible, listingId]);
+
+  const handleSubmitComment = async () => {
+    if (!comment.trim() || !userDoc || !listingId) return;
+
     setIsSubmitting(true);
-    
-    // Simulate API call
-    setTimeout(() => {
-      const newComment: Comment = {
-        id: Date.now().toString(),
-        userId: 'currentUser', // In a real app, this would be the current user's ID
-        userName: 'You',
-        text: comment.trim(),
-        timestamp: new Date(),
-      };
-      
-      setComments([newComment, ...comments]);
+
+    try {
+      await commentService.addComment(
+        listingId,
+        userDoc.uid,
+        userDoc.display_name,
+        userDoc.photo_url || null,
+        comment.trim()
+      );
+
       setComment('');
+      Keyboard.dismiss();
+    } catch (error) {
+      console.error('Error posting comment:', error);
+      alert('Failed to post comment. Please try again.');
+    } finally {
       setIsSubmitting(false);
-    }, 500);
+    }
   };
 
   const renderComment = ({ item }: { item: Comment }) => {
-    const isCurrentUser = item.userId === 'currentUser';
+    const isCurrentUser = item.userId === userDoc?.uid;
     
     return (
       <View style={styles.commentContainer}>
@@ -197,43 +208,53 @@ export default function CommentsModal({
                 </View>
               )}
               
-              {/* Action buttons */}
+              {/* Action buttons - Share button hidden as requested */}
               <View style={styles.actionRow}>
                 <View style={styles.actionButton}>
                   <AntDesign name="heart" size={18} color="#FF4B4B" />
                   <Text style={[styles.actionText, { color: C.textMuted }]}>22</Text>
                 </View>
-                
+
                 <View style={styles.actionButton}>
                   <AntDesign name="message" size={18} color={C.textMuted} />
-                  <Text style={[styles.actionText, { color: C.textMuted }]}>13</Text>
+                  <Text style={[styles.actionText, { color: C.textMuted }]}>{comments.length}</Text>
                 </View>
-                
-                <TouchableOpacity style={styles.messageIconButton}>
+
+                {/* Share button hidden for now */}
+                {/* <TouchableOpacity style={styles.messageIconButton}>
                   <Ionicons name="paper-plane-outline" size={18} color={C.textMuted} />
-                </TouchableOpacity>
+                </TouchableOpacity> */}
               </View>
             </View>
 
             {/* Comments section */}
             <View style={{ flex: 1 }}>
               <Text style={[styles.commentsHeader, { color: C.text }]}>Comments</Text>
-              <FlatList
-                data={comments}
-                renderItem={renderComment}
-                keyExtractor={item => item.id}
-                contentContainerStyle={styles.commentsContainer}
-                showsVerticalScrollIndicator={false}
-                ListEmptyComponent={
-                  <View style={styles.emptyContainer}>
-                    <Ionicons name="chatbubble-outline" size={64} color={C.textMuted} />
-                    <Text style={[styles.emptyText, { color: C.text }]}>No comments yet</Text>
-                    <Text style={[styles.emptySubtext, { color: C.textMuted }]}>
-                      Be the first to comment
-                    </Text>
-                  </View>
-                }
-              />
+              {isLoading ? (
+                <View style={styles.emptyContainer}>
+                  <ActivityIndicator size="large" color={C.tint} />
+                  <Text style={[styles.emptySubtext, { color: C.textMuted, marginTop: 12 }]}>
+                    Loading comments...
+                  </Text>
+                </View>
+              ) : (
+                <FlatList
+                  data={comments}
+                  renderItem={renderComment}
+                  keyExtractor={item => item.id}
+                  contentContainerStyle={styles.commentsContainer}
+                  showsVerticalScrollIndicator={false}
+                  ListEmptyComponent={
+                    <View style={styles.emptyContainer}>
+                      <Ionicons name="chatbubble-outline" size={64} color={C.textMuted} />
+                      <Text style={[styles.emptyText, { color: C.text }]}>No comments yet</Text>
+                      <Text style={[styles.emptySubtext, { color: C.textMuted }]}>
+                        Be the first to comment
+                      </Text>
+                    </View>
+                  }
+                />
+              )}
             </View>
 
             {/* Comment input */}
