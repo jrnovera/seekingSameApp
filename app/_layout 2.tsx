@@ -56,6 +56,7 @@ export default function RootLayout() {
             <Stack.Screen name="viewlisting" options={{ headerShown: false }} />
             <Stack.Screen name="notifications" options={{headerShown: false}} />
             <Stack.Screen name="my-bookings" options={{headerShown: false}} />
+            <Stack.Screen name="personal-information" options={{headerShown:false}} />
           </Stack>
           <StatusBar style="auto" />
         </ThemeProvider>
