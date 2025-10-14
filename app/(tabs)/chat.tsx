@@ -1,6 +1,8 @@
-import conversationService from '@/services/conversationService';
-import communityPostService from '@/services/communityPostService';
 import { Colors } from '@/constants/theme';
+import type { GroupChat } from '@/services/communityPostService';
+import communityPostService from '@/services/communityPostService';
+import type { Conversation } from '@/services/conversationService';
+import conversationService from '@/services/conversationService';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { getAuth } from 'firebase/auth';
@@ -15,8 +17,6 @@ import {
   useColorScheme,
   View,
 } from 'react-native';
-import type { Conversation } from '@/services/conversationService';
-import type { GroupChat } from '@/services/communityPostService';
 
 // Display conversation type for list
 type ConversationDisplay = {
@@ -280,9 +280,9 @@ export default function Chat() {
                       <Text style={[styles.name, { color: C.text }]}>{item.otherUser?.displayName || item.otherUser?.email || 'Unknown User'}</Text>
                       <Text style={[styles.time, { color: C.textMuted }]}>{formatTime(item.messageTime)}</Text>
                     </View>
-                    <Text numberOfLines={1} style={[styles.propertyTitle, { color: C.textMuted }]}>
+                    {/* <Text numberOfLines={1} style={[styles.propertyTitle, { color: C.textMuted }]}>
                       🏠 {item.propertyTitle}
-                    </Text>
+                    </Text> */}
                     <View style={styles.msgRow}>
                       <Text numberOfLines={1} style={[styles.msg, { color: C.textMuted }]}>
                         {item.isFromCurrentUser ? 'You: ' : ''}{item.lastMessage || 'No messages yet'}
