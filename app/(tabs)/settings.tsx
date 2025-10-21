@@ -74,16 +74,17 @@ export default function SettingsScreen() {
 
       {/* Account Section - Refined */}
       <Text style={[styles.sectionLabel, { color: C.textMuted }]}>Account Settings</Text>
-      <View style={[styles.card, { backgroundColor: C.surface, borderColor: C.surfaceBorder }]}> 
-        <RowItem 
-          icon={<MaterialIcons name="person-outline" size={20} color={C.tint} />} 
-          label="Personal Information" 
+      <View style={[styles.card, { backgroundColor: C.surface, borderColor: C.surfaceBorder }]}>
+        <RowItem
+          icon={<MaterialIcons name="person-outline" size={20} color={C.tint} />}
+          label="Personal Information"
           description="Update your profile details"
+          onPress={() => router.push('/personal-information')}
         />
         <Divider color={C.surfaceBorder} />
-        <RowItem 
-          icon={<MaterialIcons name="book-online" size={20} color={C.tint} />} 
-          label="My Bookings" 
+        <RowItem
+          icon={<MaterialIcons name="book-online" size={20} color={C.tint} />}
+          label="My Bookings"
           description="View your booking history and transactions"
           onPress={() => router.push('/my-bookings')}
         />

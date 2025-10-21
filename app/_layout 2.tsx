@@ -45,7 +45,6 @@ export default function RootLayout() {
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="property/details" options={{ headerShown: false }} />
             <Stack.Screen name="conversation/[id]" options={{ headerShown: false }} />
-            <Stack.Screen name="group-chat/[id]" options={{ headerShown: false }} />
             <Stack.Screen name="host/[id]" options={{ headerShown: false }} />
             <Stack.Screen name="contact-support" options={{ headerShown: false }} />
             <Stack.Screen name="property/[id]" options={{ headerShown: false }} />
