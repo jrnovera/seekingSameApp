@@ -996,26 +996,7 @@ export default function PropertyDetails() {
             </View>
           </View>
 
-          {/* Add Review Button - Only show if user has rented the property */}
-          {auth.currentUser && !hasUserReviewed && hasUserRented && (
-            <TouchableOpacity
-              style={[styles.addReviewButton, { backgroundColor: '#3c95a6' }]}
-              onPress={handleAddReview}
-            >
-              <Ionicons name="star-outline" size={20} color="#fff" />
-              <Text style={styles.addReviewButtonText}>Write a Review</Text>
-            </TouchableOpacity>
-          )}
-
-          {/* Message for users who haven't rented yet */}
-          {auth.currentUser && !hasUserRented && !checkingRentalStatus && (
-            <View style={styles.rentalRequiredMessage}>
-              <Ionicons name="information-circle-outline" size={20} color={C.textMuted} />
-              <Text style={[styles.rentalRequiredText, { color: C.textMuted }]}>
-                You need to rent this property before you can write a review
-              </Text>
-            </View>
-          )}
+          {/* Review button removed - Reviews are now submitted via host-provided link on website */}
 
           {/* Reviews List */}
           {reviews.length > 0 ? (

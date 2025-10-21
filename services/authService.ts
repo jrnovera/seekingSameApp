@@ -59,7 +59,12 @@ export class AuthService {
       // Prepare data for Firestore (convert undefined to null, include all fields)
       const firestoreData = this.convertUndefinedToNull({
         ...userDoc,
-        created_time: serverTimestamp()
+        created_time: serverTimestamp(),
+        metadata: {
+          source: 'mobile_app',
+          platform: 'ios_android',
+          signupDate: serverTimestamp()
+        }
       });
 
       // Save to Firestore
