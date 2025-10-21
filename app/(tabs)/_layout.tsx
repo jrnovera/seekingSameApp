@@ -5,7 +5,7 @@ import React from 'react';
 import AuthGuard from '@/components/AuthGuard';
 import { FloatingTabBar } from '@/components/floating-tab-bar';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function TabLayout() {
@@ -54,19 +54,6 @@ export default function TabLayout() {
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons
               name={focused ? "chatbubble" : "chatbubble-outline"}
-              size={size ?? 24}
-              color={color}
-            />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="community"
-        options={{
-          title: 'Community',
-          tabBarIcon: ({ color, size, focused }) => (
-            <MaterialCommunityIcons
-              name={focused ? "account-group" : "account-group-outline"}
               size={size ?? 24}
               color={color}
             />
