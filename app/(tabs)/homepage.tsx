@@ -1121,13 +1121,13 @@ export default function Homepage() {
                               name={
                                 favoritedProperties.has(item.id)
                                   ? "heart"
-                                  : ("heart-o" as any)
+                                  : ("heart" as any)
                               }
                               size={18}
                               color={
                                 favoritedProperties.has(item.id)
                                   ? "#FF6B9D"
-                                  : "#3c95a6"
+                                  : "gray"
                               }
                             />
                           </TouchableOpacity>
@@ -1397,11 +1397,11 @@ export default function Homepage() {
                       name={
                         favoritedProperties.has(l.id)
                           ? "heart"
-                          : ("heart-o" as any)
+                          : ("heart" as any)
                       }
                       size={14}
                       color={
-                        favoritedProperties.has(l.id) ? "#FF6B9D" : "#3c95a6"
+                        favoritedProperties.has(l.id) ? "#FF6B9D" : "gray"
                       }
                     />
                   </TouchableOpacity>

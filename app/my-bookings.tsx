@@ -4,14 +4,14 @@ import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    useColorScheme,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  useColorScheme,
+  View,
 } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -142,12 +142,12 @@ export default function MyBookingsScreen() {
       </View>
 
       <View style={styles.bookingFooter}>
-        <TouchableOpacity
+       {/*  <TouchableOpacity
           style={[styles.actionButton, { backgroundColor: C.tint + '10' }]}
           onPress={() => router.push(`/property/${item.propertyId}`)}
         >
           <Text style={[styles.actionButtonText, { color: C.tint }]}>View Property</Text>
-        </TouchableOpacity>
+        </TouchableOpacity> */}
       </View>
     </TouchableOpacity>
   );
