@@ -2,9 +2,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, ImageBackground, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
+import { ActivityIndicator, Animated, ImageBackground, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '../../config/firebase';
+import { AuthErrorModal } from '../../components/AuthErrorModal';
 
 export default function ForgotPasswordScreen() {
   const isDark = useColorScheme() === 'dark';
@@ -14,8 +15,16 @@ export default function ForgotPasswordScreen() {
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
 
   const [email, setEmail] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [localLoading, setLocalLoading] = useState(false);
   const [resetSent, setResetSent] = useState(false);
+  const [errorModal, setErrorModal] = useState({
+    visible: false,
+    title: '',
+    message: ''
+  });
+
+  // Use local loading state
+  const loading = localLoading;
   
   // Start entrance animation when component mounts
   useEffect(() => {
@@ -36,18 +45,38 @@ export default function ForgotPasswordScreen() {
 
   const handleResetPassword = async () => {
     if (!email.trim()) {
-      Alert.alert('Error', 'Please enter your email address');
+      setErrorModal({
+        visible: true,
+        title: 'Email Required',
+        message: 'Please enter your email address to receive a password reset link.'
+      });
       return;
     }
 
     try {
-      setLoading(true);
+      setLocalLoading(true);
       await sendPasswordResetEmail(auth, email.trim());
       setResetSent(true);
     } catch (error: any) {
-      Alert.alert('Password Reset Failed', error.message || 'Please try again.');
+      let errorMessage = 'Please try again.';
+      if (error.code === 'auth/user-not-found') {
+        errorMessage = 'No account found with this email address. Please check your email or sign up.';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = 'Please enter a valid email address.';
+      } else if (error.code === 'auth/network-request-failed') {
+        errorMessage = 'Network error. Please check your connection and try again.';
+      }
+
+      // Use a small delay to ensure the component is stable before showing modal
+      setTimeout(() => {
+        setErrorModal({
+          visible: true,
+          title: 'Password Reset Failed',
+          message: errorMessage
+        });
+      }, 100);
     } finally {
-      setLoading(false);
+      setLocalLoading(false);
     }
   };
 
@@ -138,6 +167,15 @@ export default function ForgotPasswordScreen() {
           )}
         </Animated.View>
       </ScrollView>
+
+      {/* Error Modal */}
+      <AuthErrorModal
+        visible={errorModal.visible}
+        title={errorModal.title}
+        message={errorModal.message}
+        onClose={() => setErrorModal({ visible: false, title: '', message: '' })}
+        type="error"
+      />
     </View>
   );
 }

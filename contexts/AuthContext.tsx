@@ -67,13 +67,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
-      
+
       if (firebaseUser) {
         // Get user document from Firestore (this will also update storage)
         const userDocument = await AuthService.getUserDocument(firebaseUser.uid);
+
+        // Check if user has 'customer' role
+        if (userDocument && userDocument.role !== 'customer') {
+          // Sign out host/admin accounts immediately
+          await AuthService.signOut();
+          await clearStoredAuthUser();
+          setUser(null);
+          setUserDoc(null);
+          setIsAuthenticated(false);
+          setLoading(false);
+          return;
+        }
+
         setUserDoc(userDocument);
         setIsAuthenticated(true);
-        
+
         // Note: Auth data is now saved by setupFirebaseAuthPersistence
       } else {
         // If no Firebase user but we had stored data, clear it
@@ -85,7 +98,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setUserDoc(null);
         setIsAuthenticated(false);
       }
-      
+
       setLoading(false);
     });
 
@@ -94,29 +107,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const signUp = async (userData: CreateUserData): Promise<void> => {
     try {
-      setLoading(true);
       const { user: firebaseUser, userDoc: newUserDoc } = await AuthService.signUp(userData);
       setUser(firebaseUser);
       setUserDoc(newUserDoc);
       setIsAuthenticated(true);
     } catch (error) {
+      // Don't update loading state on error - let the UI component handle it
       throw error;
-    } finally {
-      setLoading(false);
     }
   };
 
   const signIn = async (loginData: LoginData): Promise<void> => {
     try {
-      setLoading(true);
       const { user: firebaseUser, userDoc: existingUserDoc } = await AuthService.signIn(loginData);
       setUser(firebaseUser);
       setUserDoc(existingUserDoc);
       setIsAuthenticated(true);
     } catch (error) {
+      // Don't update loading state on error - let the UI component handle it
       throw error;
-    } finally {
-      setLoading(false);
     }
   };
 

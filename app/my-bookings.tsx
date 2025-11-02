@@ -1,7 +1,4 @@
-import ReviewModal from '@/components/ReviewModal';
-import { auth } from '@/config/firebase';
 import { Colors } from '@/constants/theme';
-import reviewService from '@/services/reviewService';
 import { RentalTransaction, transactionService } from '@/services/transactionService';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -25,9 +22,6 @@ export default function MyBookingsScreen() {
   const [bookings, setBookings] = useState<RentalTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [showReviewModal, setShowReviewModal] = useState(false);
-  const [selectedBooking, setSelectedBooking] = useState<RentalTransaction | null>(null);
-  const [reviewedProperties, setReviewedProperties] = useState<Set<string>>(new Set());
 
   // Fetch bookings
   const fetchBookings = async () => {
@@ -60,41 +54,6 @@ export default function MyBookingsScreen() {
   useEffect(() => {
     fetchBookings();
   }, [user?.uid]);
-
-  // Check which properties have been reviewed
-  useEffect(() => {
-    const checkReviewedProperties = async () => {
-      if (!user?.uid || bookings.length === 0) return;
-
-      const reviewedSet = new Set<string>();
-
-      for (const booking of bookings) {
-        const hasReviewed = await reviewService.hasUserReviewedProperty(user.uid, booking.propertyId);
-        if (hasReviewed) {
-          reviewedSet.add(booking.propertyId);
-        }
-      }
-
-      setReviewedProperties(reviewedSet);
-    };
-
-    checkReviewedProperties();
-  }, [bookings, user?.uid]);
-
-  // Handle opening review modal
-  const handleWriteReview = (booking: RentalTransaction) => {
-    setSelectedBooking(booking);
-    setShowReviewModal(true);
-  };
-
-  // Handle review added callback
-  const handleReviewAdded = () => {
-    if (selectedBooking) {
-      setReviewedProperties(prev => new Set(prev).add(selectedBooking.propertyId));
-    }
-    setShowReviewModal(false);
-    setSelectedBooking(null);
-  };
 
   // Format currency
   const formatCurrency = (amount: number, currency: string) => {
@@ -189,23 +148,6 @@ export default function MyBookingsScreen() {
         >
           <Text style={[styles.actionButtonText, { color: C.tint }]}>View Property</Text>
         </TouchableOpacity>
-
-        {item.status === 'completed' && !reviewedProperties.has(item.propertyId) && (
-          <TouchableOpacity
-            style={[styles.reviewButton, { backgroundColor: C.tint }]}
-            onPress={() => handleWriteReview(item)}
-          >
-            <Ionicons name="star-outline" size={16} color="#fff" />
-            <Text style={styles.reviewButtonText}>Write Review</Text>
-          </TouchableOpacity>
-        )}
-
-        {reviewedProperties.has(item.propertyId) && (
-          <View style={[styles.reviewedBadge, { backgroundColor: '#10b981' + '20' }]}>
-            <Ionicons name="checkmark-circle" size={16} color="#10b981" />
-            <Text style={[styles.reviewedText, { color: '#10b981' }]}>Reviewed</Text>
-          </View>
-        )}
       </View>
     </TouchableOpacity>
   );
@@ -248,23 +190,6 @@ export default function MyBookingsScreen() {
           showsVerticalScrollIndicator={false}
           refreshing={refreshing}
           onRefresh={handleRefresh}
-        />
-      )}
-
-      {/* Review Modal */}
-      {selectedBooking && auth.currentUser && (
-        <ReviewModal
-          visible={showReviewModal}
-          onClose={() => {
-            setShowReviewModal(false);
-            setSelectedBooking(null);
-          }}
-          propertyId={selectedBooking.propertyId}
-          propertyTitle={selectedBooking.propertyTitle}
-          userId={auth.currentUser.uid}
-          userName={auth.currentUser.displayName || auth.currentUser.email || 'User'}
-          userEmail={auth.currentUser.email || ''}
-          onReviewAdded={handleReviewAdded}
         />
       )}
     </View>
@@ -392,31 +317,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   actionButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  reviewButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-  },
-  reviewButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  reviewedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-  },
-  reviewedText: {
     fontSize: 14,
     fontWeight: '600',
   },

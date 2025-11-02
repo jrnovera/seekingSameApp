@@ -3,19 +3,16 @@ import 'react-native-get-random-values';
 import 'react-native-url-polyfill/auto';
 
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { initializeAuth, getReactNativePersistence } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Firebase configuration using Expo public env variables
 // Note: Expo exposes only variables prefixed with EXPO_PUBLIC_ to the app at runtime
 // Compute and normalize storage bucket
 const projectId = process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || "seekingsame-80ee1";
-let storageBucketEnv = process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET || "seekingsame-80ee1.firebasestorage.app";
-if (storageBucketEnv.endsWith("firebasestorage.app")) {
-  // Normalize console domain to SDK domain
-  storageBucketEnv = `${projectId}.appspot.com`; 
-}
+const storageBucketEnv = process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET || "seekingsame-80ee1.appspot.com";
 
 const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY || "AIzaSyAy3lwlcebC9YJs_EjObxllyhJovtDfRA0",
@@ -39,14 +36,10 @@ export const app = initializeApp(firebaseConfig);
 
 // Firebase v9 modular API (preferred approach)
 
-// Initialize Firebase Authentication
-// For React Native, we'll use getAuth() here, but the actual initialization with
-// AsyncStorage persistence will happen in utils/initializeFirebaseAuth.ts
-// This approach avoids circular dependencies while still allowing proper persistence
-
-// Get auth instance - this will be properly initialized with AsyncStorage persistence
-// in the app's entry point using initializeFirebaseAuth.ts
-export const auth = getAuth(app);
+// Initialize Firebase Authentication with AsyncStorage persistence for React Native
+export const auth = initializeAuth(app, {
+  persistence: getReactNativePersistence(AsyncStorage)
+});
 
 // Initialize Cloud Firestore and get a reference to the service
 export const db = getFirestore(app);

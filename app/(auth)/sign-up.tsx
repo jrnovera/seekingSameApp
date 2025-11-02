@@ -2,7 +2,7 @@ import { AntDesign, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, ImageBackground, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
+import { ActivityIndicator, Animated, ImageBackground, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 
 export default function SignUpScreen() {
@@ -39,22 +39,27 @@ export default function SignUpScreen() {
   });
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const handleSignUp = async () => {
+    // Clear any previous error
+    setErrorMessage('');
+
+    // Validation
     if (!formData.displayName.trim()) {
-      Alert.alert('Error', 'Please enter your display name');
+      setErrorMessage('Please enter your display name');
       return;
     }
     if (!formData.email.trim()) {
-      Alert.alert('Error', 'Please enter your email');
+      setErrorMessage('Please enter your email address');
       return;
     }
     if (!formData.password.trim()) {
-      Alert.alert('Error', 'Please enter your password');
+      setErrorMessage('Please enter your password');
       return;
     }
     if (formData.password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
+      setErrorMessage('Password must be at least 6 characters long');
       return;
     }
 
@@ -66,11 +71,11 @@ export default function SignUpScreen() {
         display_name: formData.displayName.trim(),
         phone_number: formData.phoneNumber.trim()
       });
-      
+
       // Navigate to main app after successful sign up
       router.replace('/(tabs)/homepage');
     } catch (error: any) {
-      Alert.alert('Sign Up Failed', error.message);
+      setErrorMessage(error.message || 'An error occurred. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -115,7 +120,10 @@ export default function SignUpScreen() {
             placeholderTextColor={isDark ? '#9aa3b2' : '#b0b7c3'}
             style={[styles.input, formData.displayName ? styles.inputFocused : null]}
             value={formData.displayName}
-            onChangeText={(text) => setFormData(prev => ({ ...prev, displayName: text }))}
+            onChangeText={(text) => {
+              setFormData(prev => ({ ...prev, displayName: text }));
+              setErrorMessage('');
+            }}
             editable={!loading}
           />
         </View>
@@ -129,7 +137,10 @@ export default function SignUpScreen() {
             autoCapitalize="none"
             style={styles.input}
             value={formData.email}
-            onChangeText={(text) => setFormData(prev => ({ ...prev, email: text }))}
+            onChangeText={(text) => {
+              setFormData(prev => ({ ...prev, email: text }));
+              setErrorMessage('');
+            }}
             editable={!loading}
           />
         </View>
@@ -142,21 +153,32 @@ export default function SignUpScreen() {
             secureTextEntry={!showPassword}
             style={[styles.input, { paddingRight: 44 }]}
             value={formData.password}
-            onChangeText={(text) => setFormData(prev => ({ ...prev, password: text }))}
+            onChangeText={(text) => {
+              setFormData(prev => ({ ...prev, password: text }));
+              setErrorMessage('');
+            }}
             editable={!loading}
           />
-          <TouchableOpacity 
-            style={styles.iconButton} 
+          <TouchableOpacity
+            style={styles.iconButton}
             activeOpacity={0.7}
             onPress={() => setShowPassword(!showPassword)}
           >
-            <Ionicons 
-              name={showPassword ? "eye-outline" : "eye-off-outline"} 
-              size={20} 
-              color="#9ca3af" 
+            <Ionicons
+              name={showPassword ? "eye-outline" : "eye-off-outline"}
+              size={20}
+              color="#9ca3af"
             />
           </TouchableOpacity>
         </View>
+
+        {/* Error Message */}
+        {errorMessage ? (
+          <View style={styles.errorContainer}>
+            <Ionicons name="alert-circle" size={16} color="#ef4444" />
+            <Text style={styles.errorText}>{errorMessage}</Text>
+          </View>
+        ) : null}
 
         {/* Create Account Button */}
         <TouchableOpacity 
@@ -404,5 +426,20 @@ const styles = StyleSheet.create({
   },
   inputFocused: {
     borderColor: 'transparent',
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fee2e2',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+    gap: 8,
+  },
+  errorText: {
+    flex: 1,
+    color: '#dc2626',
+    fontSize: 14,
+    fontWeight: '500',
   },
 });
