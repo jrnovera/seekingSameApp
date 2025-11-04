@@ -1,5 +1,4 @@
 import RemoteImage from '@/components/remote-image';
-import ReviewModal from '@/components/ReviewModal';
 import { auth, db } from '@/config/firebase';
 import { Colors } from '@/constants/theme';
 import conversationService from '@/services/conversationService';
@@ -59,12 +58,8 @@ export default function PropertyDetails() {
   const [currentImage, setCurrentImage] = useState<string | null>(null);
   const [allPhotos, setAllPhotos] = useState<string[]>([]);
   const [paymentLoading, setPaymentLoading] = useState(false);
-  const [showReviewModal, setShowReviewModal] = useState(false);
-  const [hasUserReviewed, setHasUserReviewed] = useState(false);
   const [averageRating, setAverageRating] = useState(0);
   const [totalReviews, setTotalReviews] = useState(0);
-  const [hasUserRented, setHasUserRented] = useState(false);
-  const [checkingRentalStatus, setCheckingRentalStatus] = useState(true);
   const scheme = useColorScheme() ?? 'light';
   const C = Colors[scheme as 'light' | 'dark'];
 
@@ -439,34 +434,6 @@ export default function PropertyDetails() {
     router.push(`/property/reviews?id=${property?.id}`);
   };
 
-  // Handle add review button press
-  const handleAddReview = async () => {
-    if (!auth.currentUser) {
-      Alert.alert('Sign In Required', 'Please sign in to leave a review.');
-      return;
-    }
-
-    if (!property?.id) {
-      Alert.alert('Error', 'Property information is not available.');
-      return;
-    }
-
-    if (!hasUserRented) {
-      Alert.alert(
-        'Rental Required',
-        'You need to rent this property before you can write a review.',
-        [{ text: 'OK' }]
-      );
-      return;
-    }
-
-    if (hasUserReviewed) {
-      Alert.alert('Already Reviewed', 'You have already left a review for this property.');
-      return;
-    }
-
-    setShowReviewModal(true);
-  };
 
   // Load reviews for the property
   const loadReviews = async (propertyId: string) => {
@@ -482,12 +449,6 @@ export default function PropertyDetails() {
         } else {
           setAverageRating(0);
         }
-
-        // Check if current user has reviewed this property
-        if (auth.currentUser) {
-          const hasReviewed = reviewsList.some(review => review.userId === auth.currentUser!.uid);
-          setHasUserReviewed(hasReviewed);
-        }
       });
 
       return unsubscribe;
@@ -497,57 +458,6 @@ export default function PropertyDetails() {
       setTotalReviews(0);
       setAverageRating(0);
     }
-  };
-
-  // Check if current user has reviewed this property
-  const checkUserReviewStatus = async (propertyId: string) => {
-    if (!auth.currentUser) {
-      setHasUserReviewed(false);
-      return;
-    }
-
-    try {
-      const hasReviewed = await reviewService.hasUserReviewedProperty(auth.currentUser.uid, propertyId);
-      setHasUserReviewed(hasReviewed);
-    } catch (error) {
-      console.error('Error checking user review status:', error);
-      setHasUserReviewed(false);
-    }
-  };
-
-  // Check if current user has rented this property
-  const checkUserRentalStatus = async (propertyId: string) => {
-    if (!auth.currentUser) {
-      setHasUserRented(false);
-      setCheckingRentalStatus(false);
-      return;
-    }
-
-    try {
-      setCheckingRentalStatus(true);
-      // Get all user bookings
-      const userBookings = await transactionService.getUserBookings(auth.currentUser.uid);
-
-      // Check if user has a completed rental transaction for this property
-      const hasRented = userBookings.some(
-        booking => booking.propertyId === propertyId && booking.status === 'completed'
-      );
-
-      setHasUserRented(hasRented);
-      console.log(`User has rented property ${propertyId}:`, hasRented);
-    } catch (error) {
-      console.error('Error checking user rental status:', error);
-      setHasUserRented(false);
-    } finally {
-      setCheckingRentalStatus(false);
-    }
-  };
-
-  // Handle review added callback
-  const handleReviewAdded = () => {
-    // Reviews will be updated automatically via the subscription
-    // The hasUserReviewed state will also be updated in the loadReviews callback
-    console.log('Review added successfully');
   };
 
   // Render star rating
@@ -725,9 +635,6 @@ export default function PropertyDetails() {
 
           // Check if this property is in user's favorites
           checkIfFavorite();
-
-          // Check if user has rented this property
-          checkUserRentalStatus(propertySnap.id);
         } else {
           setError('Property not found');
         }
@@ -1087,19 +994,6 @@ export default function PropertyDetails() {
         </TouchableOpacity>
       </View>
 
-      {/* Review Modal */}
-      {property && auth.currentUser && (
-        <ReviewModal
-          visible={showReviewModal}
-          onClose={() => setShowReviewModal(false)}
-          propertyId={property.id}
-          propertyTitle={property.title || 'Property'}
-          userId={auth.currentUser.uid}
-          userName={auth.currentUser.displayName || auth.currentUser.email || 'User'}
-          userEmail={auth.currentUser.email || ''}
-          onReviewAdded={handleReviewAdded}
-        />
-      )}
     </ScrollView>
   );
 }
