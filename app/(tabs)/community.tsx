@@ -1,36 +1,30 @@
-import React, { useEffect, useState, useRef } from 'react';
+import { Colors } from "@/constants/theme";
+import { AntDesign, Ionicons } from "@expo/vector-icons";
+import React, { useEffect, useRef, useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  Image,
-  TextInput,
+  ActivityIndicator,
   Animated,
   Easing,
-  useColorScheme,
-  ActivityIndicator,
-  ScrollView,
-  Modal,
+  Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { AntDesign } from '@expo/vector-icons';
-import { Colors } from '@/constants/theme';
-import { router } from 'expo-router';
-import { auth, db } from '@/config/firebase';
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  useColorScheme,
+  View,
+} from "react-native";
 // Only using collection from firestore
-import { collection } from 'firebase/firestore';
 // RemoteImage is not used in this file
 // import RemoteImage from '@/components/remote-image';
-import FilterModal, { FilterOptions } from '@/components/FilterModal';
-import CommentsModal from '@/components/CommentsModal';
-import UserProfile from '@/components/UserProfile';
-import { useAuth } from '@/contexts/AuthContext';
-import communityPostService from '@/services/communityPostService';
-import { Timestamp } from 'firebase/firestore';
+import CommentsModal from "@/components/CommentsModal";
+import UserProfile from "@/components/UserProfile";
+import { useAuth } from "@/contexts/AuthContext";
+import communityPostService from "@/services/communityPostService";
+import { Timestamp } from "firebase/firestore";
 
 // New interface for community posts (text-only)
 interface CommunityPost {
@@ -68,7 +62,7 @@ interface CommunityListing {
 */
 
 export default function Community() {
-  const scheme = useColorScheme() ?? 'light';
+  const scheme = useColorScheme() ?? "light";
   const C = Colors[scheme];
   const { userDoc } = useAuth();
 
@@ -81,11 +75,13 @@ export default function Community() {
   const [showUserProfile, setShowUserProfile] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [selectedUserName, setSelectedUserName] = useState<string | null>(null);
-  const [selectedUserPhoto, setSelectedUserPhoto] = useState<string | null>(null);
+  const [selectedUserPhoto, setSelectedUserPhoto] = useState<string | null>(
+    null
+  );
 
   // Create Post Modal state
   const [showCreatePostModal, setShowCreatePostModal] = useState(false);
-  const [newPostContent, setNewPostContent] = useState('');
+  const [newPostContent, setNewPostContent] = useState("");
 
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -105,29 +101,34 @@ export default function Community() {
         toValue: 1,
         duration: 600,
         useNativeDriver: true,
-        easing: Easing.out(Easing.quad)
+        easing: Easing.out(Easing.quad),
       }),
       Animated.timing(slideAnim, {
         toValue: 0,
         duration: 600,
         useNativeDriver: true,
-        easing: Easing.out(Easing.quad)
-      })
+        easing: Easing.out(Easing.quad),
+      }),
     ]).start();
   }, []);
 
   // Load posts from Firestore
   useEffect(() => {
     setIsLoading(true);
-    const unsubscribe = communityPostService.subscribeToPosts((fetchedPosts) => {
-      // Convert Timestamp to Date for display
-      const postsWithDates = fetchedPosts.map(post => ({
-        ...post,
-        createdAt: post.createdAt instanceof Timestamp ? post.createdAt.toDate() : new Date(),
-      }));
-      setPosts(postsWithDates);
-      setIsLoading(false);
-    });
+    const unsubscribe = communityPostService.subscribeToPosts(
+      (fetchedPosts) => {
+        // Convert Timestamp to Date for display
+        const postsWithDates = fetchedPosts.map((post) => ({
+          ...post,
+          createdAt:
+            post.createdAt instanceof Timestamp
+              ? post.createdAt.toDate()
+              : new Date(),
+        }));
+        setPosts(postsWithDates);
+        setIsLoading(false);
+      }
+    );
 
     // Cleanup subscription on unmount
     return () => unsubscribe();
@@ -139,7 +140,7 @@ export default function Community() {
     const isCurrentlyLiked = likedPosts.has(postId);
 
     // Optimistically update UI
-    setLikedPosts(prev => {
+    setLikedPosts((prev) => {
       const newSet = new Set(prev);
       if (isCurrentlyLiked) {
         newSet.delete(postId);
@@ -151,11 +152,15 @@ export default function Community() {
 
     try {
       // Update in Firestore
-      await communityPostService.toggleLike(postId, userDoc.uid, isCurrentlyLiked);
+      await communityPostService.toggleLike(
+        postId,
+        userDoc.uid,
+        isCurrentlyLiked
+      );
     } catch (error) {
-      console.error('Error toggling like:', error);
+      console.error("Error toggling like:", error);
       // Revert optimistic update on error
-      setLikedPosts(prev => {
+      setLikedPosts((prev) => {
         const newSet = new Set(prev);
         if (isCurrentlyLiked) {
           newSet.add(postId);
@@ -172,7 +177,7 @@ export default function Community() {
 
     // Check if user is the post owner
     if (post.userId === userDoc.uid) {
-      alert('You are the owner of this group chat!');
+      alert("You are the owner of this group chat!");
       return;
     }
 
@@ -185,10 +190,10 @@ export default function Community() {
         userDoc.photo_url || undefined
       );
 
-      alert('Join request sent! The group admin will review your request.');
+      alert("Join request sent! The group admin will review your request.");
     } catch (error: any) {
-      console.error('Error requesting to join group:', error);
-      alert(error.message || 'Failed to send join request. Please try again.');
+      console.error("Error requesting to join group:", error);
+      alert(error.message || "Failed to send join request. Please try again.");
     }
   };
 
@@ -205,18 +210,20 @@ export default function Community() {
         userDoc.email
       );
 
-      console.log('Post created successfully:', postId);
-      console.log('Group chat created:', groupChatId);
+      console.log("Post created successfully:", postId);
+      console.log("Group chat created:", groupChatId);
 
       // Close modal and clear input
       setShowCreatePostModal(false);
-      setNewPostContent('');
+      setNewPostContent("");
 
       // Show success message (optional - you could add a toast/alert here)
-      alert('Post created successfully! A group chat has been created for this post.');
+      alert(
+        "Post created successfully! A group chat has been created for this post."
+      );
     } catch (error) {
-      console.error('Error creating post:', error);
-      alert('Failed to create post. Please try again.');
+      console.error("Error creating post:", error);
+      alert("Failed to create post. Please try again.");
     }
   };
 
@@ -228,7 +235,7 @@ export default function Community() {
   useEffect(() => {
     if (userDoc?.uid && posts.length > 0) {
       const likedPostIds = new Set<string>();
-      posts.forEach(post => {
+      posts.forEach((post) => {
         if (post.likedBy?.includes(userDoc.uid)) {
           likedPostIds.add(post.id);
         }
@@ -250,10 +257,10 @@ export default function Community() {
       const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
       const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
 
-      if (diffInMinutes < 1) return 'Just now';
+      if (diffInMinutes < 1) return "Just now";
       if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
       if (diffInHours < 24) return `${diffInHours}h ago`;
-      if (diffInDays === 1) return '1 day ago';
+      if (diffInDays === 1) return "1 day ago";
       if (diffInDays < 7) return `${diffInDays} days ago`;
       return actualDate.toLocaleDateString();
     };
@@ -271,15 +278,22 @@ export default function Community() {
             }}
           >
             {item.userPhoto ? (
-              <Image source={{ uri: item.userPhoto }} style={styles.userAvatar} />
+              <Image
+                source={{ uri: item.userPhoto }}
+                style={styles.userAvatar}
+              />
             ) : (
               <View style={[styles.userAvatar, { backgroundColor: C.tint }]}>
-                <Text style={styles.userInitial}>{item.userName.charAt(0)}</Text>
+                <Text style={styles.userInitial}>
+                  {item.userName.charAt(0)}
+                </Text>
               </View>
             )}
           </TouchableOpacity>
           <View style={styles.userNameContainer}>
-            <Text style={[styles.userName, { color: C.text }]}>{item.userName}</Text>
+            <Text style={[styles.userName, { color: C.text }]}>
+              {item.userName}
+            </Text>
             <Text style={[styles.listingType, { color: C.textMuted }]}>
               {getTimeAgo(item.createdAt)}
             </Text>
@@ -287,7 +301,9 @@ export default function Community() {
         </View>
 
         {/* Post content (text only) */}
-        <Text style={[styles.postContent, { color: C.text }]}>{item.content}</Text>
+        <Text style={[styles.postContent, { color: C.text }]}>
+          {item.content}
+        </Text>
 
         {/* Action buttons */}
         <View style={styles.actionRow}>
@@ -323,7 +339,7 @@ export default function Community() {
           {/* Only show Join Group button if the current user is NOT the post owner */}
           {item.userId !== userDoc?.uid && (
             <TouchableOpacity
-              style={[styles.messageButton, { backgroundColor: '#8B5CF6' }]}
+              style={[styles.messageButton, { backgroundColor: "#8B5CF6" }]}
               onPress={() => handleJoinGroup(item)}
             >
               <Text style={styles.messageButtonText}>Join Group</Text>
@@ -340,7 +356,9 @@ export default function Community() {
       return (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={C.tint} />
-          <Text style={[styles.loadingText, { color: C.textMuted }]}>Loading posts...</Text>
+          <Text style={[styles.loadingText, { color: C.textMuted }]}>
+            Loading posts...
+          </Text>
         </View>
       );
     }
@@ -349,16 +367,18 @@ export default function Community() {
       return (
         <View style={styles.emptyContainer}>
           <Ionicons name="chatbubbles-outline" size={64} color={C.textMuted} />
-          <Text style={[styles.emptyText, { color: C.text }]}>No posts yet</Text>
-          <Text style={[styles.emptySubtext, { color: C.textMuted }]}>Be the first to share something!</Text>
+          <Text style={[styles.emptyText, { color: C.text }]}>
+            No posts yet
+          </Text>
+          <Text style={[styles.emptySubtext, { color: C.textMuted }]}>
+            Be the first to share something!
+          </Text>
         </View>
       );
     }
 
-    return posts.map(item => (
-      <View key={item.id}>
-        {renderPostItem({ item })}
-      </View>
+    return posts.map((item) => (
+      <View key={item.id}>{renderPostItem({ item })}</View>
     ));
   };
 
@@ -369,8 +389,8 @@ export default function Community() {
         {
           backgroundColor: C.screenBg,
           opacity: fadeAnim,
-          transform: [{ translateY: slideAnim }]
-        }
+          transform: [{ translateY: slideAnim }],
+        },
       ]}
     >
       <ScrollView
@@ -385,21 +405,36 @@ export default function Community() {
 
         {/* "What's on your mind?" Input */}
         <TouchableOpacity
-          style={[styles.createPostContainer, { backgroundColor: C.surface, borderColor: C.surfaceBorder }]}
+          style={[
+            styles.createPostContainer,
+            { backgroundColor: C.surface, borderColor: C.surfaceBorder },
+          ]}
           onPress={handleOpenCreatePost}
         >
           <View style={styles.createPostRow}>
             {userDoc?.photo_url ? (
-              <Image source={{ uri: userDoc.photo_url }} style={styles.userAvatarSmall} />
+              <Image
+                source={{ uri: userDoc.photo_url }}
+                style={styles.userAvatarSmall}
+              />
             ) : (
-              <View style={[styles.userAvatarSmall, { backgroundColor: C.tint }]}>
+              <View
+                style={[styles.userAvatarSmall, { backgroundColor: C.tint }]}
+              >
                 <Text style={styles.userInitialSmall}>
-                  {userDoc?.display_name?.charAt(0) || 'U'}
+                  {userDoc?.display_name?.charAt(0) || "U"}
                 </Text>
               </View>
             )}
-            <View style={[styles.createPostInput, { backgroundColor: C.screenBg, borderColor: C.surfaceBorder }]}>
-              <Text style={[styles.createPostPlaceholder, { color: C.textMuted }]}>
+            <View
+              style={[
+                styles.createPostInput,
+                { backgroundColor: C.screenBg, borderColor: C.surfaceBorder },
+              ]}
+            >
+              <Text
+                style={[styles.createPostPlaceholder, { color: C.textMuted }]}
+              >
                 What's on your mind?
               </Text>
             </View>
@@ -407,9 +442,7 @@ export default function Community() {
         </TouchableOpacity>
 
         {/* Posts */}
-        <View style={styles.listingsContainer}>
-          {renderPosts()}
-        </View>
+        <View style={styles.listingsContainer}>{renderPosts()}</View>
       </ScrollView>
 
       {/* Create Post Modal */}
@@ -420,17 +453,24 @@ export default function Community() {
         onRequestClose={() => setShowCreatePostModal(false)}
       >
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
           style={styles.modalContainer}
         >
           <View style={styles.modalOverlay}>
             <View style={[styles.modalContent, { backgroundColor: C.surface }]}>
               {/* Modal Header */}
-              <View style={[styles.modalHeader, { borderBottomColor: C.surfaceBorder }]}>
+              <View
+                style={[
+                  styles.modalHeader,
+                  { borderBottomColor: C.surfaceBorder },
+                ]}
+              >
                 <TouchableOpacity onPress={() => setShowCreatePostModal(false)}>
                   <Ionicons name="close" size={28} color={C.text} />
                 </TouchableOpacity>
-                <Text style={[styles.modalTitle, { color: C.text }]}>Create Post</Text>
+                <Text style={[styles.modalTitle, { color: C.text }]}>
+                  Create Post
+                </Text>
                 <TouchableOpacity
                   onPress={handleCreatePost}
                   disabled={!newPostContent.trim()}
@@ -439,7 +479,7 @@ export default function Community() {
                     style={[
                       styles.postButton,
                       {
-                        color: newPostContent.trim() ? '#8B5CF6' : C.textMuted,
+                        color: newPostContent.trim() ? "#8B5CF6" : C.textMuted,
                       },
                     ]}
                   >
@@ -451,16 +491,21 @@ export default function Community() {
               {/* User info */}
               <View style={styles.modalUserInfo}>
                 {userDoc?.photo_url ? (
-                  <Image source={{ uri: userDoc.photo_url }} style={styles.userAvatar} />
+                  <Image
+                    source={{ uri: userDoc.photo_url }}
+                    style={styles.userAvatar}
+                  />
                 ) : (
-                  <View style={[styles.userAvatar, { backgroundColor: C.tint }]}>
+                  <View
+                    style={[styles.userAvatar, { backgroundColor: C.tint }]}
+                  >
                     <Text style={styles.userInitial}>
-                      {userDoc?.display_name?.charAt(0) || 'U'}
+                      {userDoc?.display_name?.charAt(0) || "U"}
                     </Text>
                   </View>
                 )}
                 <Text style={[styles.userName, { color: C.text }]}>
-                  {userDoc?.display_name || 'User'}
+                  {userDoc?.display_name || "User"}
                 </Text>
               </View>
 
@@ -505,7 +550,7 @@ export default function Community() {
           visible={showUserProfile}
           onClose={() => setShowUserProfile(false)}
           userId={selectedUserId}
-          userName={selectedUserName || ''}
+          userName={selectedUserName || ""}
           userPhoto={selectedUserPhoto || undefined}
         />
       )}
@@ -528,11 +573,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.1)',
+    borderBottomColor: "rgba(0,0,0,0.1)",
   },
   headerTitle: {
     fontSize: 28,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   // Create Post Container
   createPostContainer: {
@@ -544,21 +589,21 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   createPostRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
   },
   userAvatarSmall: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   userInitialSmall: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 14,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   createPostInput: {
     flex: 1,
@@ -599,24 +644,24 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 8,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.1)',
+    borderBottomColor: "rgba(0,0,0,0.1)",
   },
   userInfoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 8,
   },
   userAvatar: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   userInitial: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   userNameContainer: {
     marginLeft: 12,
@@ -624,7 +669,8 @@ const styles = StyleSheet.create({
   },
   userName: {
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: "600",
+    left: 10,
   },
   listingType: {
     fontSize: 13,
@@ -632,11 +678,11 @@ const styles = StyleSheet.create({
   },
   timeAgo: {
     fontSize: 13,
-    fontWeight: '400',
+    fontWeight: "400",
   },
   listingTitle: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
     marginBottom: 4,
     lineHeight: 20,
   },
@@ -646,21 +692,21 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   detailsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 4,
   },
   locationContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   locationText: {
     fontSize: 13,
     marginLeft: 4,
   },
   bedroomRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 4,
   },
   bedroomText: {
@@ -669,27 +715,27 @@ const styles = StyleSheet.create({
   },
   priceText: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
     marginBottom: 12,
   },
   imageContainer: {
     height: 200,
     borderRadius: 8,
-    overflow: 'hidden',
+    overflow: "hidden",
     marginBottom: 12,
   },
   listingImage: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
   },
   actionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingTop: 8,
   },
   actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginRight: 20,
   },
   actionText: {
@@ -705,14 +751,14 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   messageButtonText: {
-    color: '#fff',
-    fontWeight: '600',
+    color: "#fff",
+    fontWeight: "600",
     fontSize: 14,
   },
   loadingContainer: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   loadingText: {
     marginTop: 12,
@@ -720,13 +766,13 @@ const styles = StyleSheet.create({
   },
   emptyContainer: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingBottom: 80,
   },
   emptyText: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: "600",
     marginTop: 16,
   },
   emptySubtext: {
@@ -739,34 +785,34 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "flex-end",
   },
   modalContent: {
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingBottom: 40,
-    minHeight: '60%',
+    minHeight: "60%",
   },
   modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   postButton: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   modalUserInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 12,
@@ -776,12 +822,12 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     fontSize: 16,
     minHeight: 150,
-    textAlignVertical: 'top',
+    textAlignVertical: "top",
   },
   characterCount: {
     paddingHorizontal: 20,
     paddingTop: 8,
     fontSize: 12,
-    textAlign: 'right',
+    textAlign: "right",
   },
 });

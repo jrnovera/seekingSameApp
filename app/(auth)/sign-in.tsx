@@ -2,7 +2,7 @@ import { AntDesign, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, ImageBackground, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
+import { ActivityIndicator, Animated, ImageBackground, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, useColorScheme, View } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 
 export default function SignInScreen() {
@@ -19,6 +19,7 @@ export default function SignInScreen() {
   });
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   
   // Start entrance animation when component mounts
   useEffect(() => {
@@ -38,12 +39,16 @@ export default function SignInScreen() {
   }, []);
 
   const handleSignIn = async () => {
+    // Clear any previous error
+    setErrorMessage('');
+
+    // Validation
     if (!formData.email.trim()) {
-      Alert.alert('Error', 'Please enter your email');
+      setErrorMessage('Please enter your email address');
       return;
     }
     if (!formData.password.trim()) {
-      Alert.alert('Error', 'Please enter your password');
+      setErrorMessage('Please enter your password');
       return;
     }
 
@@ -53,11 +58,11 @@ export default function SignInScreen() {
         email: formData.email.trim(),
         password: formData.password
       });
-      
+
       // Navigate to main app after successful sign in
       router.replace('/(tabs)/homepage');
     } catch (error: any) {
-      Alert.alert('Sign In Failed', error.message);
+      setErrorMessage(error.message || 'An error occurred. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -105,7 +110,10 @@ export default function SignInScreen() {
               autoCapitalize="none"
               style={styles.input}
               value={formData.email}
-              onChangeText={(text) => setFormData(prev => ({ ...prev, email: text }))}
+              onChangeText={(text) => {
+                setFormData(prev => ({ ...prev, email: text }));
+                setErrorMessage(''); // Clear error when user types
+              }}
               editable={!loading}
             />
           </View>
@@ -118,25 +126,36 @@ export default function SignInScreen() {
               secureTextEntry={!showPassword}
               style={[styles.input, { paddingRight: 44 }]}
               value={formData.password}
-              onChangeText={(text) => setFormData(prev => ({ ...prev, password: text }))}
+              onChangeText={(text) => {
+                setFormData(prev => ({ ...prev, password: text }));
+                setErrorMessage(''); // Clear error when user types
+              }}
               editable={!loading}
             />
-            <TouchableOpacity 
-              style={styles.iconButton} 
+            <TouchableOpacity
+              style={styles.iconButton}
               activeOpacity={0.7}
               onPress={() => setShowPassword(!showPassword)}
             >
-              <Ionicons 
-                name={showPassword ? "eye-outline" : "eye-off-outline"} 
-                size={20} 
-                color="#9ca3af" 
+              <Ionicons
+                name={showPassword ? "eye-outline" : "eye-off-outline"}
+                size={20}
+                color="#9ca3af"
               />
             </TouchableOpacity>
           </View>
 
+          {/* Error Message */}
+          {errorMessage ? (
+            <View style={styles.errorContainer}>
+              <Ionicons name="alert-circle" size={16} color="#ef4444" />
+              <Text style={styles.errorText}>{errorMessage}</Text>
+            </View>
+          ) : null}
+
           {/* Forgot password link */}
-          <TouchableOpacity 
-            style={styles.forgotLink} 
+          <TouchableOpacity
+            style={styles.forgotLink}
             activeOpacity={0.8}
             onPress={() => router.push('/forgot-password')}
           >
@@ -340,5 +359,20 @@ const styles = StyleSheet.create({
   linkHighlight: {
     color: 'purple',
     fontWeight: '600',
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fee2e2',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+    gap: 8,
+  },
+  errorText: {
+    flex: 1,
+    color: '#dc2626',
+    fontSize: 14,
+    fontWeight: '500',
   },
 });

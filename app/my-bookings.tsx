@@ -4,14 +4,14 @@ import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    useColorScheme,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  useColorScheme,
+  View,
 } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -308,6 +308,8 @@ const styles = StyleSheet.create({
   bookingFooter: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
+    gap: 8,
+    flexWrap: 'wrap',
   },
   actionButton: {
     paddingVertical: 8,

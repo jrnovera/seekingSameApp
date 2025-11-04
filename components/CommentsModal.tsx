@@ -1,25 +1,25 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Modal,
-  TouchableOpacity,
-  Image,
-  TextInput,
-  FlatList,
-  KeyboardAvoidingView,
-  Platform,
-  Keyboard,
-  TouchableWithoutFeedback,
-  ActivityIndicator,
-} from 'react-native';
-import { AntDesign, Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/theme';
+import { useAuth } from '@/contexts/AuthContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import commentService from '@/services/commentService';
-import { useAuth } from '@/contexts/AuthContext';
+import { AntDesign, Ionicons } from '@expo/vector-icons';
 import { Timestamp } from 'firebase/firestore';
+import React, { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  Image,
+  Keyboard,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
+} from 'react-native';
 
 interface Comment {
   id: string;
@@ -303,7 +303,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingVertical: Platform.OS === "ios" ? 50 : 40,
     borderBottomWidth: 1,
   },
   backButton: {

@@ -15,6 +15,18 @@ export interface User {
   recentSearch: string[];
   idPhoto?: string | null | undefined;
   isSubscribe: boolean;
+  // Profile fields
+  bio?: string;
+  location?: string;
+  interests?: string;
+  religion?: string;
+  about?: string;
+  preferences?: {
+    dietary?: string;
+    lifestyle?: string;
+    pets?: string;
+    schedule?: string;
+  };
 }
 
 export interface CreateUserData {

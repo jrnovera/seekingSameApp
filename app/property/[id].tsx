@@ -97,19 +97,33 @@ export default function PropertyDetails() {
           if (data.createdAt) {
             createdAt = data.createdAt.toDate ? data.createdAt.toDate() : new Date(data.createdAt);
           }
-          
+
+          // Handle createdby - it might be a DocumentReference
+          let createdby: string | undefined;
+          const createdbyField = data.createdby ?? data.createdBy ?? data.created_by ?? data.owner;
+          if (createdbyField) {
+            // Check if it's a Firestore DocumentReference
+            if (typeof createdbyField === 'object' && createdbyField._key) {
+              // It's a DocumentReference, extract the ID
+              createdby = createdbyField.id || createdbyField._key?.path?.segments?.pop();
+            } else if (typeof createdbyField === 'string') {
+              // It's already a string
+              createdby = createdbyField;
+            }
+          }
+
           setProperty({
             id: propertySnap.id,
             title: data.title ?? data.name ?? 'Untitled',
             // Handle location data - don't use coordinates for display
-            location: typeof data.location === 'string' ? data.location : 
+            location: typeof data.location === 'string' ? data.location :
                      (data.address ? data.address : 'Unknown'),
             price: data.price ?? data.rent ?? undefined,
             type: data.type ?? data.category ?? undefined,
             imageUrl: data.imageUrl ?? data.imageURL ?? data.photoUrl ?? data.photoURL ?? null,
             // Make sure we prioritize cities data
             cities: data.city ?? data.cities ?? data.location?.city ?? undefined,
-            createdby: data.createdby ?? data.createdBy ?? data.created_by ?? data.owner ?? undefined,
+            createdby: createdby,
             createdAt: createdAt,
             state: data.state ?? undefined,
             zipCode: data.zipCode ?? data.zip ?? undefined,

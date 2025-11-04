@@ -6,6 +6,7 @@ import conversationService from '@/services/conversationService';
 import { checkIfFavorited, createFavorite, removeFavorite } from '@/services/favoriteService';
 import { paymentService } from '@/services/paymentService';
 import reviewService, { Review } from '@/services/reviewService';
+import { transactionService } from '@/services/transactionService';
 import { Entypo, FontAwesome, Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import * as Linking from 'expo-linking';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -62,6 +63,8 @@ export default function PropertyDetails() {
   const [hasUserReviewed, setHasUserReviewed] = useState(false);
   const [averageRating, setAverageRating] = useState(0);
   const [totalReviews, setTotalReviews] = useState(0);
+  const [hasUserRented, setHasUserRented] = useState(false);
+  const [checkingRentalStatus, setCheckingRentalStatus] = useState(true);
   const scheme = useColorScheme() ?? 'light';
   const C = Colors[scheme as 'light' | 'dark'];
 
@@ -448,6 +451,15 @@ export default function PropertyDetails() {
       return;
     }
 
+    if (!hasUserRented) {
+      Alert.alert(
+        'Rental Required',
+        'You need to rent this property before you can write a review.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
     if (hasUserReviewed) {
       Alert.alert('Already Reviewed', 'You have already left a review for this property.');
       return;
@@ -500,6 +512,34 @@ export default function PropertyDetails() {
     } catch (error) {
       console.error('Error checking user review status:', error);
       setHasUserReviewed(false);
+    }
+  };
+
+  // Check if current user has rented this property
+  const checkUserRentalStatus = async (propertyId: string) => {
+    if (!auth.currentUser) {
+      setHasUserRented(false);
+      setCheckingRentalStatus(false);
+      return;
+    }
+
+    try {
+      setCheckingRentalStatus(true);
+      // Get all user bookings
+      const userBookings = await transactionService.getUserBookings(auth.currentUser.uid);
+
+      // Check if user has a completed rental transaction for this property
+      const hasRented = userBookings.some(
+        booking => booking.propertyId === propertyId && booking.status === 'completed'
+      );
+
+      setHasUserRented(hasRented);
+      console.log(`User has rented property ${propertyId}:`, hasRented);
+    } catch (error) {
+      console.error('Error checking user rental status:', error);
+      setHasUserRented(false);
+    } finally {
+      setCheckingRentalStatus(false);
     }
   };
 
@@ -685,6 +725,9 @@ export default function PropertyDetails() {
 
           // Check if this property is in user's favorites
           checkIfFavorite();
+
+          // Check if user has rented this property
+          checkUserRentalStatus(propertySnap.id);
         } else {
           setError('Property not found');
         }
@@ -953,16 +996,7 @@ export default function PropertyDetails() {
             </View>
           </View>
 
-          {/* Add Review Button */}
-          {auth.currentUser && !hasUserReviewed && (
-            <TouchableOpacity
-              style={[styles.addReviewButton, { backgroundColor: '#3c95a6' }]}
-              onPress={handleAddReview}
-            >
-              <Ionicons name="star-outline" size={20} color="#fff" />
-              <Text style={styles.addReviewButtonText}>Write a Review</Text>
-            </TouchableOpacity>
-          )}
+          {/* Review button removed - Reviews are now submitted via host-provided link on website */}
 
           {/* Reviews List */}
           {reviews.length > 0 ? (
@@ -1490,5 +1524,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
     lineHeight: 22,
+  },
+  rentalRequiredMessage: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginBottom: 16,
+    gap: 8,
+  },
+  rentalRequiredText: {
+    fontSize: 14,
+    textAlign: 'center',
+    flex: 1,
+    lineHeight: 20,
   },
 });

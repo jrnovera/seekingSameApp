@@ -1,10 +1,10 @@
 import {
-    createUserWithEmailAndPassword,
-    User as FirebaseUser,
-    getIdToken,
-    signInWithEmailAndPassword,
-    signOut,
-    updateProfile
+  createUserWithEmailAndPassword,
+  User as FirebaseUser,
+  getIdToken,
+  signInWithEmailAndPassword,
+  signOut,
+  updateProfile
 } from 'firebase/auth';
 import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
@@ -45,7 +45,7 @@ export class AuthService {
         phone_number: userData.phone_number || '',
         created_time: new Date(),
         isNewUser: true,
-        role: 'host', // Default role
+        role: 'customer', // Default role
         favorites: [],
         walkthrough: false,
         isVerified: false,
@@ -59,7 +59,12 @@ export class AuthService {
       // Prepare data for Firestore (convert undefined to null, include all fields)
       const firestoreData = this.convertUndefinedToNull({
         ...userDoc,
-        created_time: serverTimestamp()
+        created_time: serverTimestamp(),
+        metadata: {
+          source: 'mobile_app',
+          platform: 'ios_android',
+          signupDate: serverTimestamp()
+        }
       });
 
       // Save to Firestore
@@ -81,17 +86,17 @@ export class AuthService {
   static async signIn(loginData: LoginData): Promise<{ user: FirebaseUser; userDoc: User | null }> {
     try {
       const userCredential = await signInWithEmailAndPassword(
-        auth, 
-        loginData.email, 
+        auth,
+        loginData.email,
         loginData.password
       );
-      
+
       const firebaseUser = userCredential.user;
-      
+
       // Get user document from Firestore
       const userDocRef = doc(db, 'users', firebaseUser.uid);
       const userDocSnap = await getDoc(userDocRef);
-      
+
       let userDoc: User | null = null;
       if (userDocSnap.exists()) {
         const data = userDocSnap.data();
@@ -99,6 +104,13 @@ export class AuthService {
           ...data,
           created_time: data.created_time?.toDate() || new Date()
         } as User;
+      }
+
+      // Check if user has the 'customer' role
+      if (userDoc && userDoc.role !== 'customer') {
+        // Sign out immediately to prevent navigation to homepage
+        await signOut(auth);
+        throw new Error('ACCESS_DENIED');
       }
 
       // Get Firebase ID token and save to SecureStore
@@ -110,7 +122,11 @@ export class AuthService {
 
       return { user: firebaseUser, userDoc };
     } catch (error: any) {
-      console.error('Sign in error:', error);
+      //console.error('Sign in error:', error);
+      // If it's our custom access denied error, handle it specifically
+      if (error.message === 'ACCESS_DENIED') {
+        throw new Error('Host accounts cannot be used to sign in to the customer app. Please use a customer account.');
+      }
       throw new Error(this.getAuthErrorMessage(error.code));
     }
   }
@@ -195,15 +211,19 @@ export class AuthService {
       case 'auth/invalid-email':
         return 'Please enter a valid email address.';
       case 'auth/user-not-found':
-        return 'No account found with this email. Please check your email or sign up.';
+        return 'Invalid email or password. Please check your credentials and try again.';
       case 'auth/wrong-password':
-        return 'Incorrect password. Please try again.';
+        return 'Invalid email or password. Please check your credentials and try again.';
+      case 'auth/invalid-credential':
+        return 'Invalid email or password. Please check your credentials and try again.';
       case 'auth/too-many-requests':
-        return 'Too many failed attempts. Please try again later.';
+        return 'Too many failed login attempts. Please try again later or reset your password.';
       case 'auth/network-request-failed':
-        return 'Network error. Please check your connection and try again.';
+        return 'Network error. Please check your internet connection and try again.';
+      case 'auth/user-disabled':
+        return 'This account has been disabled. Please contact support for assistance.';
       default:
-        return 'An error occurred. Please try again.';
+        return 'An error occurred during authentication. Please try again.';
     }
   }
 }
