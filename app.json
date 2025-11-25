@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "seekingSame",
-    "slug": "seekingSame",
+    "slug": "seeking-same",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/newlogo.png",
@@ -12,6 +12,10 @@
       "supportsTablet": true,
       "config": {
         "googleMapsApiKey": "AIzaSyAy3lwlcebC9YJs_EjObxllyhJovtDfRA0"
+      },
+      "bundleIdentifier": "com.mycompany.seekingsame",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -25,7 +29,8 @@
         "googleMaps": {
           "apiKey": "AIzaSyAy3lwlcebC9YJs_EjObxllyhJovtDfRA0"
         }
-      }
+      },
+      "package": "com.mycompany.seekingsame"
     },
     "web": {
       "output": "static",
@@ -50,6 +55,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "07825538-7034-4bf9-9591-befa1b268e2e"
+      }
+    },
+    "owner": "jrnovera"
   }
 }
